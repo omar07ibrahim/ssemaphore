@@ -4,6 +4,12 @@ This threat model covers the SSEmaphore v0.1 target. It distinguishes controls
 the gateway can prove from properties that remain owned by its deployment or
 inference upstream.
 
+> **Current checkpoint:** strict request parsing, bounded admission, bearer to
+> tenant mapping, pre-dispatch slots, and an injected non-streaming lifecycle
+> are implemented. There is no runnable server or real upstream transport yet.
+> Connection/header/write deadlines, fixed destination and proxy policy, SSE,
+> telemetry, and persistence below remain target controls.
+
 ## Assets
 
 - service availability and bounded memory, goroutines, file descriptors, and
@@ -45,11 +51,13 @@ Threats include slow headers, oversized bodies, JSON bombs, excessive message
 counts, integer overflow, duplicate keys, and clients that disconnect during
 decode.
 
-Controls: finite accepted-connection, server header, body-read, and total
-request limits; `http.MaxBytesReader`; strict single-value JSON parsing;
-duplicate-key and invalid-UTF-8 rejection; checked reservation arithmetic;
-bounded collections; and cancellation-aware decode. Validation completes
-before queue insertion.
+Implemented controls: nonblocking per-tenant and global pre-dispatch request
+slots; a finite body-read deadline; `http.MaxBytesReader`; strict single-value
+JSON parsing; duplicate-key and invalid-UTF-8 rejection; checked reservation
+arithmetic; bounded collections; and cancellation-aware decode. Validation
+completes before queue insertion. Accepted-connection, request-header,
+header-read, and total server deadlines remain work for the runnable-server
+milestone.
 
 ### Queue capture and unfair dispatch
 
@@ -70,12 +78,14 @@ is stated only in bounded estimated-service units, never inferred GPU cost.
 A client may try to forward its bearer token, select a new upstream, inject
 hop-by-hop headers, or use proxy-related environment variables.
 
-Controls: client credentials terminate at ingress and map immutably to a
-configured tenant; a separate upstream credential is loaded from runtime
-configuration; the upstream URL is parsed and validated once at startup;
-request paths cannot contain an authority; redirects are disabled;
-`http.Transport.Proxy` is `nil`; and forwarded request and response headers use
-allowlists.
+Implemented controls: client credentials terminate at ingress, only SHA-256
+digests are retained after construction, credentials map immutably to a
+configured tenant, exact paths cannot contain an authority or query, and the
+injected upstream receives no inbound header, credential, URL, or response
+writer. The real-transport milestone must separately load an upstream
+credential, validate one fixed URL, disable redirects and environment proxies,
+disable transparent compression, and construct outbound headers from an
+allowlist.
 
 ### Slow, malformed, or malicious upstream
 
@@ -83,26 +93,27 @@ The upstream may hang before headers, stream forever, emit an oversized event,
 truncate JSON, omit `[DONE]`, lie about content type, or return sensitive
 headers.
 
-Controls: distinct connect, response-header, idle-event, total-stream, event,
-and total-response limits; bounded SSE parsing without the default
-`bufio.Scanner` token limit; UTF-8 and framing checks; content-type checks;
-transparent compression disabled; encoded responses rejected; response header
-allowlists; one terminal owner for cleanup; no retry in v0.1.
+Implemented non-streaming controls: one finite upstream deadline; exact status,
+content-type, and content-encoding checks; a 16 MiB hard response ceiling above
+the lower configured limit; UTF-8, Unicode escape, nesting, duplicate-key,
+trailing-value, and exact object checks; full validation before commitment; no
+upstream response headers; one terminal cleanup owner; and no retry. Connect,
+response-header, SSE idle/event/stream, transport compression, and redirect
+controls remain part of the real transport and streaming milestones.
 
 ### Client disconnects and slow readers
 
 A disconnected client may leave upstream work running. A slow reader may block
 the relay and retain an in-flight reservation indefinitely.
 
-Controls: the upstream request derives from the incoming request context; Go
-cancels an incoming request context when the client connection closes. Every
-downstream write and flush receives a refreshed bounded write deadline, and a
-total request deadline prevents indefinite slot retention. Tests observe
-cancellation at the deterministic upstream. Cancellation only signals the
-permit context: the worker must still call `Finish`, and only that exact-once
-transition releases in-flight accounting. Drain evidence must show all counters
-return after worker cleanup. No claim is made about GPU resource reclamation
-after HTTP cancellation.
+Implemented controls: the scheduler permit context derives from the incoming
+request context, the injected upstream must honor that context, a canceled
+blocked body is closed, and the worker always calls `Finish` before releasing
+in-flight accounting. Tests observe queued and in-flight cancellation at a
+deterministic upstream and prove client cancellation writes no error response.
+Per-write deadlines, slow-reader handling, and a total server deadline remain
+for the runnable relay. No claim is made about GPU resource reclamation after
+HTTP cancellation.
 
 ### Retry and response confusion
 

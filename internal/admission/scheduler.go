@@ -24,6 +24,31 @@ func New(config Config) (*Scheduler, error) {
 	return newScheduler(config, systemClock{})
 }
 
+// MaxBodyBytes reports the validated per-request body bound.
+func (s *Scheduler) MaxBodyBytes() uint64 { return s.config.maxBodyBytes }
+
+// MaxRequestUnits reports the validated per-request work bound.
+func (s *Scheduler) MaxRequestUnits() uint64 { return s.config.maxRequestUnits }
+
+// GlobalQueueLimits returns a copy of the validated global queue limits.
+func (s *Scheduler) GlobalQueueLimits() QueueLimits { return s.config.globalQueue }
+
+// TenantQueueLimits returns a copy of a configured tenant's validated queue
+// limits. The boolean is false when id is not configured.
+func (s *Scheduler) TenantQueueLimits(id TenantID) (QueueLimits, bool) {
+	index, exists := s.config.tenantByID[id]
+	if !exists {
+		return QueueLimits{}, false
+	}
+	return s.config.tenants[index].queue, true
+}
+
+// HasTenant reports whether id belongs to the scheduler's validated tenant set.
+func (s *Scheduler) HasTenant(id TenantID) bool {
+	_, exists := s.config.tenantByID[id]
+	return exists
+}
+
 func newScheduler(config Config, schedulerClock clock) (*Scheduler, error) {
 	validated, err := validateConfig(config)
 	if err != nil {

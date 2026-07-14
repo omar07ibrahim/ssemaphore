@@ -6,13 +6,14 @@ turns tenant weights, bounded estimated work, queue deadlines, and client
 disconnects into explicit lifecycle decisions before an inference upstream is
 overloaded.
 
-> **Status:** the strict non-streaming request boundary and bounded admission
-> scheduler are implemented. The HTTP handler and upstream relay have not
-> landed, so there is no runnable gateway yet.
+> **Status:** the strict non-streaming request boundary, bounded admission
+> scheduler, and authenticated injected HTTP lifecycle are implemented. A real
+> upstream transport and runnable server have not landed, so there is no
+> deployable gateway yet.
 
 ## Implemented now
 
-The Go request parser and admission scheduler enforce the first two proof
+The Go request parser, scheduler, and HTTP integration enforce three proof
 boundaries:
 
 - a 16 MiB hard body ceiling above the lower operator-configured limit;
@@ -38,8 +39,30 @@ The scheduler adds:
 - golden traces, an independent seeded DRR oracle, adversarial fragmentation
   tests, deterministic fake-clock races, race detection, and 32-bit tests.
 
-Streaming is deliberately rejected by this first implementation slice. The
-target v0.1 contract below remains broader than the code that exists today.
+The non-streaming HTTP lifecycle adds:
+
+- exact path, method, bearer, media-type, queue-timeout, and body-validation
+  precedence with static content-free error envelopes;
+- construction-time credential hashing, immutable tenant selection, and no
+  client-controlled tenant or request ID;
+- nonblocking tenant-first and global pre-dispatch slots held from immediately
+  before body read until scheduler acquisition returns;
+- an injected upstream interface that receives only the permit context and a
+  validated request, never inbound headers, credentials, URLs, or a response
+  writer;
+- full bounded response buffering and strict `object: "chat.completion"`
+  validation before a `200` is committed, with no upstream headers relayed;
+- exact permit outcomes for completion, cancellation, upstream failure,
+  downstream failure, and recovered internal failure;
+- adversarial tests for cancellation races, blocked-body closure, slot
+  saturation, malformed upstreams, timeout, short writes, panic cleanup, race
+  detection, and 32-bit arithmetic.
+
+Streaming is deliberately rejected by this implementation slice. The real
+fixed-destination HTTP transport, server connection/header/write bounds,
+signal-driven drain, telemetry, journal, and restart reconciliation are also
+still target work. The v0.1 contract below remains broader than the code that
+exists today.
 
 ## The research question
 

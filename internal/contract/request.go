@@ -38,6 +38,12 @@ type Parser struct {
 	limits      Limits
 }
 
+// MaxBodyBytes reports the validated request-body bound used by this parser.
+func (p *Parser) MaxBodyBytes() uint64 { return p.limits.MaxBodyBytes }
+
+// MaxRequestUnits reports the validated reservation bound used by this parser.
+func (p *Parser) MaxRequestUnits() uint64 { return p.limits.MaxRequestUnits }
+
 // ErrorClass is the stable HTTP-facing category of a parse failure.
 type ErrorClass uint8
 
@@ -272,13 +278,30 @@ func (r Request) ReservationUnits() uint64 { return r.reservationUnits }
 // BodyReader returns a new read-only cursor over the validated body. The
 // underlying bytes remain owned by Request and are not exposed for mutation.
 func (r Request) BodyReader() io.Reader {
-	return bytes.NewReader(r.body)
+	return &requestBodyReader{body: r.body}
 }
 
 // BodyCopy returns an independent copy for tests or integrations that require
 // byte-slice ownership.
 func (r Request) BodyCopy() []byte {
 	return bytes.Clone(r.body)
+}
+
+// requestBodyReader intentionally implements only io.Reader. In particular,
+// it does not expose bytes.Reader's WriteTo fast path, which would hand the
+// privately owned backing slice to a caller-supplied writer.
+type requestBodyReader struct {
+	body   []byte
+	offset int
+}
+
+func (r *requestBodyReader) Read(destination []byte) (int, error) {
+	if r.offset >= len(r.body) {
+		return 0, io.EOF
+	}
+	n := copy(destination, r.body[r.offset:])
+	r.offset += n
+	return n, nil
 }
 
 // Parse reads at most MaxBodyBytes+1 bytes and validates the non-streaming v0

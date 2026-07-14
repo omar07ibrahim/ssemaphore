@@ -37,6 +37,44 @@ func newTestParser(t *testing.T, limits Limits) *Parser {
 	return parser
 }
 
+func TestParserReportsValidatedIntegrationLimits(t *testing.T) {
+	t.Parallel()
+	limits := testLimits()
+	parser := newTestParser(t, limits)
+	limits.MaxBodyBytes = 1
+	limits.MaxRequestUnits = 1
+
+	if got := parser.MaxBodyBytes(); got != testLimits().MaxBodyBytes {
+		t.Fatalf("MaxBodyBytes() = %d, want %d", got, testLimits().MaxBodyBytes)
+	}
+	if got := parser.MaxRequestUnits(); got != testLimits().MaxRequestUnits {
+		t.Fatalf("MaxRequestUnits() = %d, want %d", got, testLimits().MaxRequestUnits)
+	}
+}
+
+func TestRequestBodyReaderDoesNotExposePrivateBackingBytes(t *testing.T) {
+	t.Parallel()
+	parser := newTestParser(t, testLimits())
+	body := []byte(`{"model":"local-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":32}`)
+	request, err := parser.Parse(context.Background(), bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	firstReader := request.BodyReader()
+	if _, exposesBackingSlice := firstReader.(io.WriterTo); exposesBackingSlice {
+		t.Fatal("BodyReader() exposes its private backing bytes through io.WriterTo")
+	}
+	fromFirstReader, readErr := io.ReadAll(firstReader)
+	if readErr != nil || !bytes.Equal(fromFirstReader, body) {
+		t.Fatalf("first BodyReader() = (%q, %v), want exact body", fromFirstReader, readErr)
+	}
+	fromSecondReader, readErr := io.ReadAll(request.BodyReader())
+	if readErr != nil || !bytes.Equal(fromSecondReader, body) {
+		t.Fatal("BodyReader() cursors are not independent")
+	}
+}
+
 func parseReason(t *testing.T, parser *Parser, body []byte) (ErrorClass, Reason) {
 	t.Helper()
 	_, err := parser.Parse(context.Background(), bytes.NewReader(body))

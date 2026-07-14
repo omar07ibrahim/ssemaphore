@@ -4,6 +4,12 @@ This document defines the v0.1 target and the claims that its evidence must
 support. A feature is out of scope unless it strengthens bounded admission,
 request lifecycle correctness, or the observability of those decisions.
 
+> **Implementation checkpoint:** the request contract, admission scheduler,
+> and injected non-streaming HTTP lifecycle are implemented. The repository
+> does not yet contain a runnable server, real upstream HTTP transport,
+> streaming relay, telemetry, or restart journal. Controls below that depend
+> on those components remain release targets rather than current claims.
+
 ## Product claim
 
 SSEmaphore will be a single-process, single-node admission-control laboratory
@@ -160,6 +166,13 @@ that permit.
 v0.1 performs no automatic retry. This makes the most important boundary easy
 to audit: an upstream request is attempted at most once, and a response is
 never replayed after the first downstream byte.
+
+The implemented non-streaming path reads at most the configured response limit
+plus one byte, validates one JSON object whose `object` field is exactly
+`chat.completion`, closes the upstream body, rechecks cancellation, and only
+then commits a `200`. It relays no upstream header. Invalid metadata, read
+failure, malformed JSON, duplicate keys, wrong object type, trailing data,
+oversize data, and close failure become the same static `502` before commit.
 
 Before response commitment, a gateway failure is a typed JSON error. After a
 stream begins, the HTTP status cannot be changed; the gateway cancels upstream,

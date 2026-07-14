@@ -1,7 +1,8 @@
 # HTTP API subset
 
-This is the target contract for `ssemaphore.api v0`. The implementation will
-serve a tested compatibility subset of the official
+This document separates the implemented non-streaming checkpoint from later
+`ssemaphore.api v0` streaming work. The current code serves a tested
+compatibility subset of the official
 [Chat Completions create API][chat-create]. Anything not listed here is
 unsupported even if another server accepts it.
 
@@ -15,20 +16,21 @@ Authorization: Bearer <tenant credential>
 
 Other methods and paths fail without contacting the upstream. Client bearer
 credentials select a configured immutable tenant and are never forwarded. No
-header or JSON field can override that identity. The gateway uses a separate
-operator-configured upstream credential for one fixed upstream.
+header or JSON field can override that identity. The current injected upstream
+receives neither the client credential nor any destination. A later real
+transport will use a separate operator credential for one fixed upstream.
 
 An optional `X-SSEmaphore-Queue-Timeout-Ms` header may request a queue timeout
 shorter than the configured default. It is a positive bounded decimal integer
 and is removed before dispatch. Omitting it uses the operator default.
 
-The gateway returns its own opaque `X-Request-Id`. Client-selected request IDs
-are outside the v0 subset because an arbitrary client string cannot enter the
-content-free lifecycle event type.
+The handler returns its own 128-bit lowercase hexadecimal `X-Request-Id`.
+Client-selected request IDs are ignored so every downstream identifier remains
+bounded and server-owned, including when the later lifecycle event lands.
 
 ## Request JSON
 
-The smallest streaming request is:
+The smallest implemented non-streaming request is:
 
 ```json
 {
@@ -36,9 +38,7 @@ The smallest streaming request is:
   "messages": [
     {"role": "user", "content": "Explain bounded backpressure."}
   ],
-  "max_completion_tokens": 128,
-  "stream": true,
-  "stream_options": {"include_usage": true}
+  "max_completion_tokens": 128
 }
 ```
 
@@ -49,8 +49,8 @@ Supported top-level fields:
 | `model` | Required string equal to the configured public alias. |
 | `messages` | Required nonempty array within the configured count limit. |
 | `max_completion_tokens` | Required positive integer within the configured limit. |
-| `stream` | Optional boolean; defaults to `false`. |
-| `stream_options` | Optional only when streaming; only `include_usage` is accepted. |
+| `stream` | Optional boolean; if present it must be exactly `false`. |
+| `stream_options` | Rejected by the current checkpoint. |
 | `n` | Optional integer; if present it must equal `1`. |
 
 Each message has exactly `role` and `content`. `role` is one of `developer`,
@@ -70,30 +70,25 @@ For non-streaming calls, the upstream must return one bounded JSON object with
 the v0 response boundary; a malformed or oversized upstream response becomes a
 `502` before downstream commitment.
 
-For streaming calls, the upstream must return `text/event-stream`. Each bounded
-SSE event contains one `data:` payload holding either a
-`chat.completion.chunk` JSON object or the terminal `[DONE]` marker. The gateway
-flushes complete events, never partial JSON. If `include_usage` is requested,
-the official contract permits a final usage chunk before `[DONE]`; an
-interrupted stream may not contain that usage total.
+Streaming is not implemented and `stream: true` fails before admission. The
+target streaming milestone will require `text/event-stream`, bounded complete
+events, `chat.completion.chunk` payloads, and a terminal `[DONE]` marker.
 
-Only an allowlist of end-to-end headers is relayed. Hop-by-hop headers,
-upstream cookies, upstream authentication metadata, and internal server headers
-are removed. Redirects are not followed, environment proxy settings are
-ignored, transparent compression is disabled, and encoded upstream bodies are
-rejected.
+The implemented non-streaming handler relays no upstream headers. It sets only
+its own `Content-Type`, exact `Content-Length`, `Cache-Control`,
+`X-Content-Type-Options`, and `X-Request-Id`. Redirect, environment proxy,
+transparent compression, and fixed-destination rules belong to the not-yet-
+implemented real HTTP transport.
 
 ## Errors before response commitment
 
-Errors use one JSON envelope:
+Errors use one static JSON envelope:
 
 ```json
 {
   "error": {
-    "message": "tenant admission capacity is exhausted",
-    "type": "ssemaphore_error",
-    "param": null,
-    "code": "tenant_capacity_exhausted"
+    "code": "tenant_capacity_exhausted",
+    "message": "The tenant has no request capacity available."
   }
 }
 ```
@@ -102,7 +97,7 @@ The stable v0 codes are:
 
 | Status | Code | Meaning |
 | --- | --- | --- |
-| `400` | `invalid_request` | Malformed JSON or a contract violation. |
+| `400` | `invalid_request` | Malformed JSON, an invalid queue header, a contract violation, or a body read failure/deadline. |
 | `401` | `invalid_tenant_credential` | Missing or unknown tenant credential. |
 | `404` | `unsupported_path` | The path is outside the v0 API. |
 | `405` | `unsupported_method` | The endpoint does not accept the method. |
@@ -110,7 +105,7 @@ The stable v0 codes are:
 | `415` | `unsupported_media_type` | The request is not JSON. |
 | `429` | `tenant_capacity_exhausted` | A tenant request, byte, or work limit is exhausted. |
 | `500` | `internal_error` | An internal invariant or required server capability failed. |
-| `502` | `upstream_invalid` | Upstream failed before a response was committed. |
+| `502` | `invalid_upstream_response` | The upstream call, metadata, body, or close failed before response commitment. |
 | `503` | `overloaded` | A global request, byte, or work limit is exhausted. |
 | `503` | `queue_deadline_exceeded` | The request expired before upstream dispatch. |
 | `503` | `draining` | The process is no longer accepting work. |
@@ -118,10 +113,9 @@ The stable v0 codes are:
 
 `401` includes `WWW-Authenticate: Bearer`, and `405` includes `Allow: POST`.
 SSEmaphore does not emit `Retry-After` until it can calculate an honest bounded
-estimate. After an SSE response is committed, errors cancel the upstream and
-close the stream without a synthetic `[DONE]`; only a private content-free
-lifecycle reason records the incomplete stream. A second JSON error response
-is impossible.
+estimate. The current non-streaming response is fully buffered before commit;
+if a downstream write then fails, the handler records a downstream failure and
+does not append a second JSON error envelope.
 
 ## Compatibility statement
 
