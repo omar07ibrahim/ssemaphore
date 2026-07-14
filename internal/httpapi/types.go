@@ -47,12 +47,28 @@ type Config struct {
 	Credentials            []Credential
 }
 
+// TimeoutPolicy exposes only the immutable durations needed to derive the
+// enclosing HTTP server's total read and write deadlines.
+type TimeoutPolicy struct {
+	DefaultQueueTimeout time.Duration
+	BodyReadTimeout     time.Duration
+	UpstreamTimeout     time.Duration
+}
+
 // NonStreamingUpstream receives only a validated request and the permit-owned
 // context. It cannot observe inbound credentials, headers, URLs, or the
 // downstream ResponseWriter. Complete may be called concurrently and must
 // return when ctx is canceled.
 type NonStreamingUpstream interface {
 	Complete(context.Context, contract.Request) (UpstreamResponse, error)
+}
+
+// IdleConnectionCloser is an optional NonStreamingUpstream capability. Its
+// method may run concurrently with Complete, must not interrupt active work,
+// and must return promptly. Handler recovers an implementation panic so a
+// terminal server cleanup cannot crash the process.
+type IdleConnectionCloser interface {
+	CloseIdleConnections()
 }
 
 // UpstreamResponse is the bounded response candidate returned by an injected
