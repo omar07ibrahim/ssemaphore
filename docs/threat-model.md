@@ -60,9 +60,10 @@ order.
 Controls: global and per-tenant request, body-byte, and reservation limits;
 FIFO order inside a tenant; stable tenant ordering; carried DRR deficit;
 positive bounded weights; checked cost and deficit arithmetic; deficit reset
-for an empty queue; and property tests over adversarial sizes and arrival
-schedules. An independent oracle checks randomized traces. Fairness is stated
-only in bounded estimated-service units, never inferred GPU cost.
+for an empty queue; and a funded-head barrier when global work is fragmented.
+Adversarial tests verify that later small requests cannot indefinitely bypass a
+large funded head, and an independent oracle checks randomized traces. Fairness
+is stated only in bounded estimated-service units, never inferred GPU cost.
 
 ### Credential confusion and SSRF
 
@@ -97,8 +98,11 @@ Controls: the upstream request derives from the incoming request context; Go
 cancels an incoming request context when the client connection closes. Every
 downstream write and flush receives a refreshed bounded write deadline, and a
 total request deadline prevents indefinite slot retention. Tests observe
-cancellation at the deterministic upstream. No claim is made about GPU resource
-reclamation after HTTP cancellation.
+cancellation at the deterministic upstream. Cancellation only signals the
+permit context: the worker must still call `Finish`, and only that exact-once
+transition releases in-flight accounting. Drain evidence must show all counters
+return after worker cleanup. No claim is made about GPU resource reclamation
+after HTTP cancellation.
 
 ### Retry and response confusion
 

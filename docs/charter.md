@@ -96,20 +96,25 @@ RSS instead of presenting the raw-body counter as a memory measurement.
 
 Authentication and complete request validation happen before queue admission.
 The authentication result, never a client-supplied tenant field, selects the
-tenant queue and limits. A request is admitted only if adding its body and
-reservation stays within both global and tenant queue limits. Tenant-specific
-exhaustion returns a typed `429`; global saturation returns a typed `503`. No
-background work is created, and v0.1 does not promise `Retry-After` without an
-honest wait estimate.
+tenant queue and limits. A request is admitted only if adding its request
+count, exact body bytes, and reservation units stays within both tenant and
+global queue limits. Checks are count, bytes, then work; the tenant decision is
+evaluated first, so tenant exhaustion wins when both scopes are full and maps
+to a typed `429`. Global saturation maps to a typed `503`. No background work
+is created, and v0.1 does not promise `Retry-After` without an honest wait
+estimate.
 
-Each tenant owns a FIFO queue. Active tenants are visited by weighted deficit
-round robin. A tenant receives `base_quantum * weight` credits on a visit;
-credits carry across visits until its head request can be dispatched. A request
-dispatches only when both its reservation and the global in-flight request
-count fit. The implementation must define stable tie-breaking and must not use
-map iteration order as scheduling order. Weights and quanta are positive,
-deficit arithmetic is checked, an empty queue resets its deficit, and any
-configured deficit cap is at least `max_request_units`.
+Each tenant owns a FIFO queue. Active tenants are visited in configuration
+order by weighted deficit round robin; map iteration never determines dispatch
+order. A tenant receives `base_quantum * weight` credits on a visit, and credits
+carry across visits until its head request can be dispatched. Dispatch requires
+both tenant and global in-flight count and work capacity. Once a head is funded
+but fragmented global work prevents it from fitting, that head reserves the
+next capacity opportunity instead of being bypassed by later small requests.
+This deliberately permits temporary underutilization to prevent starvation.
+Weights and quanta are positive, arithmetic is checked, an empty queue resets
+its deficit, and the configured cap is at least
+`max_request_units - 1 + max_tenant_quantum`.
 
 The fairness claim is deliberately narrow: seeded traces of bounded variable
 request costs must match an independent weighted-DRR oracle, and saturated
@@ -135,15 +140,20 @@ Detailed terminal reasons, such as response-write timeout or invalid SSE, are
 closed enums under those outcomes. Terminal transitions are idempotent. Queued
 and in-flight counters are debited and returned exactly once, a work permit
 exists only after dispatch, and terminal state cannot be replaced by a later
-goroutine. Under the scheduler lock, canceled or expired queued work can no
-longer dispatch. Dispatch creates an upstream request from the downstream
-request context, so a client disconnect is observable as cancellation
-upstream. This proves propagation only; it does not prove that an inference
-server reclaimed accelerator work.
+goroutine. At the serialized scheduler owner, canceled or expired queued work
+can no longer dispatch. Dispatch creates an upstream request from the
+downstream request context, so a client disconnect is observable as
+cancellation upstream. This proves propagation only; it does not prove that an
+inference server reclaimed accelerator work.
 
-Queued requests carry an absolute deadline. Expiry is checked before every
-dispatch, including after a scheduler wake-up. A request that is expired or
-already canceled must never reach the upstream.
+Queued requests carry an absolute deadline fixed when admission begins, before
+the owner mailbox accepts the command, so mailbox delay consumes the timeout.
+The earlier of the queue timeout and client deadline is used; a tie is
+client-attributed. Expiry is checked before every dispatch, including after a
+scheduler wake-up. A request that is expired or already canceled must never
+reach the upstream. If cancellation races with dispatch, admission internally
+finishes the permit and returns `canceled_before_start`; the worker never owns
+that permit.
 
 ## Response commitment and retries
 
@@ -159,10 +169,13 @@ stream.
 
 ## Shutdown and restart
 
-Drain stops new admission, rejects new requests with `503`, cancels queued
-requests, and gives dispatched requests a bounded grace period. At grace expiry
-their contexts are canceled and their lifecycle entries become
-`shutdown_canceled`.
+`BeginDrain` stops new admission, rejects new requests with `503`, cancels
+queued requests, and leaves dispatched requests a caller-controlled grace
+period. At grace expiry, `ForceCancelInflight` signals remaining permit
+contexts. In-flight accounting is deliberately retained until every worker
+calls `Finish`, which records the shutdown terminal outcome and releases
+capacity exactly once. `WaitDrained` observes that terminal accounting state;
+`Close` does not create a grace timer or force cancellation itself.
 
 The later lifecycle-journal milestone uses a bounded writer queue and exposes a
 drop counter. It is not tamper-proof or an exactly-once audit log. At startup,
