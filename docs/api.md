@@ -1,8 +1,8 @@
 # HTTP API subset
 
 This document separates the implemented non-streaming checkpoint from later
-`ssemaphore.api v0` streaming work. The current code serves a tested
-compatibility subset of the official
+`ssemaphore.api v0` streaming work. The current code implements a tested
+handler and inbound-server library for a compatibility subset of the official
 [Chat Completions create API][chat-create]. Anything not listed here is
 unsupported even if another server accepts it.
 
@@ -25,9 +25,10 @@ An optional `X-SSEmaphore-Queue-Timeout-Ms` header may request a queue timeout
 shorter than the configured default. It is a positive bounded decimal integer
 and is removed before dispatch. Omitting it uses the operator default.
 
-The handler returns its own 128-bit lowercase hexadecimal `X-Request-Id`.
-Client-selected request IDs are ignored so every downstream identifier remains
-bounded and server-owned, including when the later lifecycle event lands.
+Every request that reaches the application handler receives its own 128-bit
+lowercase hexadecimal `X-Request-Id`. Client-selected request IDs are ignored
+so every application identifier remains bounded and server-owned, including
+when the later lifecycle event lands.
 
 ## Request JSON
 
@@ -90,12 +91,22 @@ request. Connect, TLS-handshake, response-header, idle-connection, header-byte,
 and connection-count limits are finite, while the handler context supplies the
 total upstream deadline. Cancellation and deadlines cross that boundary, but
 arbitrary context values do not; this prevents caller-installed HTTP trace
-hooks from observing the upstream credential. This is still a library
-checkpoint: no runnable HTTP server accepts connections yet.
+hooks from observing the upstream credential.
+
+The inbound server library is also HTTP/1 only and accepts only an already
+bound numeric-loopback TCP or Unix byte-stream listener. It caps accepted
+connections, enforces a hard header wire envelope, and derives total read and
+write deadlines from the handler policy. It is still a library checkpoint: no
+command creates that listener, loads runtime configuration, or installs signal
+handling.
+
+Automatic `OPTIONS *` handling is disabled, so that request reaches the normal
+application policy. HTTP/2 and h2c negotiation are not supported; an h2c
+upgrade remains an ordinary HTTP/1 request.
 
 ## Errors before response commitment
 
-Errors use one static JSON envelope:
+Application errors use one static JSON envelope:
 
 ```json
 {
@@ -129,6 +140,15 @@ SSEmaphore does not emit `Retry-After` until it can calculate an honest bounded
 estimate. The current non-streaming response is fully buffered before commit;
 if a downstream write then fails, the handler records a downstream failure and
 does not append a second JSON error envelope.
+
+Some requests fail inside `net/http` before the application handler exists.
+Malformed input can therefore receive Go's plain built-in `400`, and a request
+one byte beyond the configured header envelope receives its plain `431`.
+Likewise, the server's HTTP/2 preface guard emits a body-free `505`, and a rare
+request crossing the forced-shutdown dispatch boundary receives a body-free
+`503`. These transport-level responses have no application request ID or JSON
+envelope, their body shape is outside the API contract, and they never contact
+the upstream.
 
 ## Compatibility statement
 

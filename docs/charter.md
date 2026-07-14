@@ -6,9 +6,10 @@ request lifecycle correctness, or the observability of those decisions.
 
 > **Implementation checkpoint:** the request contract, admission scheduler,
 > injected non-streaming HTTP lifecycle, and fixed-destination upstream HTTP
-> transport are implemented. The repository does not yet contain a runnable
-> server, streaming relay, telemetry, or restart journal. Controls below that
-> depend on those components remain release targets rather than current claims.
+> transport now run behind a bounded inbound server lifecycle. The repository
+> does not yet contain a command, configuration loader, signal wiring,
+> streaming relay, telemetry, or restart journal. Controls below that depend on
+> those components remain release targets rather than current claims.
 
 ## Product claim
 
@@ -58,8 +59,10 @@ is versioned independently.
 
 ## Resource model
 
-Every configured limit is finite and validated before the process listens. A
-16 MiB hard request-body ceiling is the allocation envelope for parsing;
+Every implemented limit is finite and validated before the server owns or
+serves an already-created local listener. A later executable must complete all
+configuration validation before constructing that listener. A 16 MiB hard
+request-body ceiling is the allocation envelope for parsing;
 operators may configure a lower limit but not a higher one. Semantic limits are
 enforced during that bounded decode before queue admission, and all reservation
 arithmetic is checked before accounting changes:
@@ -74,6 +77,16 @@ arithmetic is checked before accounting changes:
   downstream write time, and total request duration;
 - tenant count, metric label values, lifecycle-writer queue depth, and exporter
   queue depth.
+
+Failed server construction leaves listener ownership with its caller. The
+library neither creates the listener nor bounds its kernel listen backlog.
+The implemented enclosing deadlines are checked sums:
+
+```text
+ReadTimeout  = HeaderReadTimeout + BodyReadTimeout
+WriteTimeout = BodyReadTimeout + DefaultQueueTimeout
+             + UpstreamTimeout + ResponseWriteTimeout
+```
 
 v0.1 does not embed a model tokenizer. It therefore does not call its admission
 quantity a token count. For an accepted body:
@@ -192,12 +205,20 @@ stream.
 ## Shutdown and restart
 
 `BeginDrain` stops new admission, rejects new requests with `503`, cancels
-queued requests, and leaves dispatched requests a caller-controlled grace
-period. At grace expiry, `ForceCancelInflight` signals remaining permit
-contexts. In-flight accounting is deliberately retained until every worker
-calls `Finish`, which records the shutdown terminal outcome and releases
-capacity exactly once. `WaitDrained` observes that terminal accounting state;
-`Close` does not create a grace timer or force cancellation itself.
+queued requests, and leaves dispatched requests a server-configured grace
+period. On any graceful-phase failure or timeout, `ForceCancelInflight` signals
+remaining permit contexts. In-flight accounting is deliberately retained until
+every worker calls `Finish`, which records the shutdown terminal outcome and
+releases capacity exactly once. `WaitDrained` observes that terminal accounting
+state; `Close` does not create a grace timer or force cancellation itself.
+
+The implemented inbound coordinator owns those primitives. It accepts only a
+concrete numeric-loopback TCP or Unix byte-stream listener, proves that the
+handler and server share one scheduler, derives HTTP deadlines from the handler
+policy, and starts one graceful-to-forced cleanup on independent server-owned
+contexts. `ForceCancelInflight` completes before HTTP context cancellation, so
+a client-side race cannot replace terminal shutdown attribution. The caller's
+context bounds waiting for the result, not the cleanup itself.
 
 The later lifecycle-journal milestone uses a bounded writer queue and exposes a
 drop counter. It is not tamper-proof or an exactly-once audit log. At startup,
