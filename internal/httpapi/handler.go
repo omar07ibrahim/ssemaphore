@@ -25,6 +25,7 @@ type requestIDSource func() (string, error)
 // It is immutable after construction and safe for concurrent use.
 type Handler struct {
 	parser              *contract.Parser
+	scheduler           *admission.Scheduler
 	gate                admissionGate
 	upstream            NonStreamingUpstream
 	responseValidator   *contract.ResponseValidator
@@ -45,6 +46,33 @@ func NewHandler(
 	upstream NonStreamingUpstream,
 ) (*Handler, error) {
 	return newHandler(config, parser, scheduler, schedulerGate{scheduler: scheduler}, upstream, secureRequestID)
+}
+
+// TimeoutPolicy returns a copy of the validated handler deadlines used to
+// derive enclosing server deadlines without exposing credentials or limits.
+func (h *Handler) TimeoutPolicy() TimeoutPolicy {
+	return TimeoutPolicy{
+		DefaultQueueTimeout: h.defaultQueueTimeout,
+		BodyReadTimeout:     h.bodyReadTimeout,
+		UpstreamTimeout:     h.upstreamTimeout,
+	}
+}
+
+// UsesScheduler reports whether scheduler is the exact validated scheduler
+// used by this Handler. Lifecycle owners use it to reject split ownership.
+func (h *Handler) UsesScheduler(scheduler *admission.Scheduler) bool {
+	return h != nil && scheduler != nil && h.scheduler == scheduler
+}
+
+// CloseIdleConnections releases reusable upstream connections when the
+// concrete upstream supports it. Active requests are not interrupted.
+func (h *Handler) CloseIdleConnections() {
+	defer func() {
+		_ = recover()
+	}()
+	if closer, ok := h.upstream.(IdleConnectionCloser); ok {
+		closer.CloseIdleConnections()
+	}
 }
 
 func newHandler(
@@ -71,6 +99,7 @@ func newHandler(
 
 	return &Handler{
 		parser:              parser,
+		scheduler:           scheduler,
 		gate:                gate,
 		upstream:            upstream,
 		responseValidator:   validated.responseValidator,

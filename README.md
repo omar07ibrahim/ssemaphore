@@ -8,13 +8,14 @@ overloaded.
 
 > **Status:** the strict non-streaming request boundary, bounded admission
 > scheduler, authenticated HTTP lifecycle, and fixed-destination upstream
-> transport are implemented. A runnable server has not landed, so there is no
+> transport now run behind a bounded inbound HTTP server lifecycle. There is
+> still no command, configuration loader, or signal wiring, so there is no
 > deployable gateway yet.
 
 ## Implemented now
 
-The Go request parser, scheduler, and HTTP integration enforce three proof
-boundaries:
+The Go request parser, scheduler, and HTTP integration enforce independently
+testable proof boundaries:
 
 - a 16 MiB hard body ceiling above the lower operator-configured limit;
 - raw invalid UTF-8, unpaired Unicode surrogates, duplicate keys at any depth,
@@ -77,10 +78,29 @@ The real upstream transport adds:
   timeouts, oversized headers, redirects, compression, connection bounds and
   reuse, and credential isolation.
 
-Streaming is deliberately rejected by this implementation slice. Runnable
-server connection/header/write bounds, signal-driven drain, telemetry, journal,
-and restart reconciliation are also still target work. The v0.1 contract below
-remains broader than the code that exists today.
+The bounded inbound server lifecycle adds:
+
+- ownership of one caller-created listener, with construction limited to a
+  concrete numeric-loopback TCP listener or Unix byte-stream listener; the
+  package never selects or opens an address;
+- an exact accepted-connection cap and an 8--64 KiB hard header-read envelope,
+  including compensation for Go's 4 KiB HTTP parser allowance;
+- HTTP/1 only at both the protocol configuration and handler boundary, with
+  the built-in `OPTIONS *` bypass and global error logger disabled;
+- derived whole-request read and write deadlines that include the handler's
+  body, queue, and upstream policies rather than accepting inconsistent totals;
+- one idempotent graceful-to-forced shutdown owner that drains admission,
+  attributes forced permits to shutdown before canceling connections, waits
+  for handler and scheduler accounting, and continues independently if a
+  caller stops waiting;
+- raw-wire, `net.Pipe`, scheduler-integration, repeated, race, and 32-bit tests
+  for exact header limits, slow headers and bodies, blocked writers, idle
+  keep-alives, connection-close races, HTTP/2 prefaces, and terminal shutdown.
+
+Streaming is deliberately rejected by this implementation slice. Executable
+configuration, listener creation, signal-driven invocation, telemetry,
+journal, and restart reconciliation are still target work. The v0.1 contract
+below remains broader than the code that exists today.
 
 ## The research question
 
@@ -123,7 +143,9 @@ privacy-safe telemetry, and restart reconciliation.
 
 The exact request subset and rejection codes are in [the API contract](docs/api.md).
 The lifecycle and evidence gates are in [the charter](docs/charter.md). Security
-assumptions and abuse cases are in [the threat model](docs/threat-model.md).
+assumptions and abuse cases are in [the threat model](docs/threat-model.md), and
+the implemented listener and drain invariants are in
+[the server lifecycle](docs/server-lifecycle.md).
 
 ## What this will prove
 

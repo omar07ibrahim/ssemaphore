@@ -6,9 +6,10 @@ inference upstream.
 
 > **Current checkpoint:** strict request parsing, bounded admission, bearer to
 > tenant mapping, pre-dispatch slots, and an injected non-streaming lifecycle
-> are implemented together with a fixed-destination upstream HTTP transport.
-> There is no runnable server yet. Inbound connection/header/write deadlines,
-> SSE, telemetry, and persistence below remain target controls.
+> are implemented together with fixed-destination upstream transport and a
+> bounded inbound HTTP server lifecycle. There is no runnable command yet.
+> Configuration loading, signal wiring, SSE, telemetry, and persistence below
+> remain target controls.
 
 ## Assets
 
@@ -51,13 +52,16 @@ Threats include slow headers, oversized bodies, JSON bombs, excessive message
 counts, integer overflow, duplicate keys, and clients that disconnect during
 decode.
 
-Implemented controls: nonblocking per-tenant and global pre-dispatch request
-slots; a finite body-read deadline; `http.MaxBytesReader`; strict single-value
+Implemented controls: a concrete numeric-loopback TCP or Unix-stream listener
+boundary; an exact accepted-connection cap; an 8--64 KiB header wire envelope;
+finite header, total-read, write, and idle deadlines; nonblocking per-tenant and
+global pre-dispatch request slots; `http.MaxBytesReader`; strict single-value
 JSON parsing; duplicate-key and invalid-UTF-8 rejection; checked reservation
 arithmetic; bounded collections; and cancellation-aware decode. Validation
-completes before queue insertion. Accepted-connection, request-header,
-header-read, and total server deadlines remain work for the runnable-server
-milestone.
+completes before queue insertion. The application cap does not bound the
+kernel listen backlog or bandwidth consumed before the trusted local edge.
+HTTP/1 is the only enabled protocol; TLS termination and public-edge protection
+remain deployment responsibilities.
 
 ### Queue capture and unfair dispatch
 
@@ -119,11 +123,12 @@ the relay and retain an in-flight reservation indefinitely.
 Implemented controls: the scheduler permit context derives from the incoming
 request context, the injected upstream must honor that context, a canceled
 blocked body is closed, and the worker always calls `Finish` before releasing
-in-flight accounting. Tests observe queued and in-flight cancellation at a
-deterministic upstream and prove client cancellation writes no error response.
-Per-write deadlines, slow-reader handling, and a total server deadline remain
-for the runnable relay. No claim is made about GPU resource reclamation after
-HTTP cancellation.
+in-flight accounting. The inbound server derives a finite write deadline that
+covers body read, queue residence, upstream work, and the final response-write
+allowance; a real blocked flush test reaches that deadline. Tests observe
+queued and in-flight cancellation and prove client cancellation writes no
+error response. A socket deadline cannot preempt CPU-bound code, and no claim
+is made about GPU resource reclamation after HTTP cancellation.
 
 ### Retry and response confusion
 
@@ -171,10 +176,15 @@ shared-memory files on one local filesystem.
 New admission during drain could create work that outlives the grace period,
 while queued or active work could retain capacity after cancellation.
 
-Controls: drain atomically stops admission; queued jobs transition to terminal
-`shutdown`; active jobs receive a bounded grace period; and their contexts are
-canceled at expiry. Tests assert that all request, byte, work, and telemetry
-queue counters return to their terminal values.
+Controls: one idempotent server-owned cleanup drains admission and the HTTP
+listener on an independent grace deadline. If that phase fails or expires, it
+seals new inner handler work, commits `ForceCancelInflight` before canceling
+HTTP contexts, closes connections, and waits on both tracked handlers and
+scheduler accounting under a separate force deadline. A caller context bounds
+only that caller's wait and cannot abort cleanup. The handler and server must
+own the same scheduler instance. Tests prove terminal `shutdown` attribution,
+exact result counters, concurrent-caller identity, and zero scheduler counters
+before owner close; uncooperative work yields static `ErrShutdownIncomplete`.
 
 ## Explicitly unmitigated in v0.1
 
