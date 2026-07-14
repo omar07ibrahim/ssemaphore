@@ -47,6 +47,15 @@ type validatedConfig struct {
 	maxConnections        int
 }
 
+// ValidateConfig checks the complete inbound server policy without requiring
+// a listener or taking ownership of any runtime resource. Callers that select
+// a listener can therefore fail closed before binding an address. New repeats
+// the same validation defensively when ownership is transferred.
+func ValidateConfig(config Config, policy httpapi.TimeoutPolicy) error {
+	_, err := validateConfig(config, policy)
+	return err
+}
+
 func validateConfig(config Config, policy httpapi.TimeoutPolicy) (validatedConfig, error) {
 	if err := validateTimeout("header read", config.HeaderReadTimeout, absoluteMaxServerTimeout); err != nil {
 		return validatedConfig{}, err

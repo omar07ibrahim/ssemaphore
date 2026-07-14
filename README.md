@@ -7,10 +7,10 @@ disconnects into explicit lifecycle decisions before an inference upstream is
 overloaded.
 
 > **Status:** the strict non-streaming request boundary, bounded admission
-> scheduler, authenticated HTTP lifecycle, and fixed-destination upstream
-> transport now run behind a bounded inbound HTTP server lifecycle. There is
-> still no command, configuration loader, or signal wiring, so there is no
-> deployable gateway yet.
+> scheduler, authenticated HTTP lifecycle, fixed-destination upstream
+> transport, bounded inbound server, and Linux local-gateway command now run as
+> one tested path. Streaming, telemetry, persistence, and restart
+> reconciliation remain future milestones.
 
 ## Implemented now
 
@@ -97,10 +97,26 @@ The bounded inbound server lifecycle adds:
   for exact header limits, slow headers and bodies, blocked writers, idle
   keep-alives, connection-close races, HTTP/2 prefaces, and terminal shutdown.
 
-Streaming is deliberately rejected by this implementation slice. Executable
-configuration, listener creation, signal-driven invocation, telemetry,
-journal, and restart reconciliation are still target work. The v0.1 contract
-below remains broader than the code that exists today.
+The runnable Linux gateway adds:
+
+- a strict, versioned, non-secret JSON policy with no defaults or runtime
+  overrides and a private `0600` regular-file boundary;
+- exact environment-name references, one-time credential consumption before
+  bind, tenant-token hashing, and rejection of duplicate or cross-domain
+  credential values;
+- a numeric-loopback-only TCP listener whose actual bound address must exactly
+  match the validated policy;
+- complete parser, scheduler, HTTP, transport, and server preflight before the
+  listener is opened, with rollback at every ownership boundary;
+- exact `validate` and `serve` commands plus SIGINT/SIGTERM supervision that
+  joins the server's terminal cleanup under a derived watchdog;
+- adversarial configuration, secret, CLI, ownership, real-loopback, race, and
+  32-bit tests, including a full client-to-upstream wire path.
+
+See [the local runbook](docs/running.md). Streaming is deliberately rejected by
+this implementation slice. Telemetry, the lifecycle journal, and restart
+reconciliation are still target work, so the v0.1 contract below remains
+broader than the code that exists today.
 
 ## The research question
 
@@ -145,7 +161,8 @@ The exact request subset and rejection codes are in [the API contract](docs/api.
 The lifecycle and evidence gates are in [the charter](docs/charter.md). Security
 assumptions and abuse cases are in [the threat model](docs/threat-model.md), and
 the implemented listener and drain invariants are in
-[the server lifecycle](docs/server-lifecycle.md).
+[the server lifecycle](docs/server-lifecycle.md), and the executable boundary
+is in [the local runbook](docs/running.md).
 
 ## What this will prove
 

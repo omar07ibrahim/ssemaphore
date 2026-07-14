@@ -5,11 +5,12 @@ support. A feature is out of scope unless it strengthens bounded admission,
 request lifecycle correctness, or the observability of those decisions.
 
 > **Implementation checkpoint:** the request contract, admission scheduler,
-> injected non-streaming HTTP lifecycle, and fixed-destination upstream HTTP
-> transport now run behind a bounded inbound server lifecycle. The repository
-> does not yet contain a command, configuration loader, signal wiring,
-> streaming relay, telemetry, or restart journal. Controls below that depend on
-> those components remain release targets rather than current claims.
+> injected non-streaming HTTP lifecycle, fixed-destination upstream HTTP
+> transport, bounded inbound server, strict Linux policy loader, loopback
+> listener selection, and signal-owned command now run as one tested path. The
+> repository does not yet contain a streaming relay, telemetry, or restart
+> journal. Controls below that depend on those components remain release
+> targets rather than current claims.
 
 ## Product claim
 
@@ -60,8 +61,9 @@ is versioned independently.
 ## Resource model
 
 Every implemented limit is finite and validated before the server owns or
-serves an already-created local listener. A later executable must complete all
-configuration validation before constructing that listener. A 16 MiB hard
+serves an already-created local listener. The executable completes policy,
+credential, parser, scheduler, HTTP, upstream, and server validation before
+constructing that listener. A 16 MiB hard
 request-body ceiling is the allocation envelope for parsing;
 operators may configure a lower limit but not a higher one. Semantic limits are
 enforced during that bounded decode before queue admission, and all reservation

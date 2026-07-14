@@ -84,11 +84,11 @@ func New(
 	if !handler.UsesScheduler(scheduler) {
 		return nil, errors.New("HTTP handler and server must own the same admission scheduler")
 	}
-	if err := validateListener(listener); err != nil {
-		return nil, err
-	}
 	validated, err := validateConfig(config, handler.TimeoutPolicy())
 	if err != nil {
+		return nil, err
+	}
+	if err := validateListener(listener); err != nil {
 		return nil, err
 	}
 	return newServer(validated, listener, handler, scheduler, handler), nil

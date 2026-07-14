@@ -1,10 +1,11 @@
 # Inbound server lifecycle
 
 This document describes the implemented `internal/server` library checkpoint.
-It is not an executable: the package never creates a listener, chooses an
-address, loads credentials, installs signal handlers, or exposes a public
-port. A later command must supply already validated application components and
-an already bound local listener.
+The package is not itself an executable: it never creates a listener, chooses
+an address, loads credentials, installs signal handlers, or exposes a public
+port. The separate `internal/app` boundary now performs those local-only tasks
+and supplies already validated components and an already bound listener. The
+server constructor validates again before taking coordinated ownership.
 
 ## Construction and ownership
 
@@ -149,7 +150,8 @@ listener or scheduler errors are never returned from those paths.
   documented cancellation and concurrency contracts. A panic from the
   optional closer is contained, but an implementation that never returns can
   still violate terminal latency.
-- There is no command, signal integration, deployment manifest, TLS manager,
-  telemetry sink, or public-internet listener in this checkpoint.
+- The runnable command and signal integration live outside this package. There
+  is still no deployment manifest, TLS manager, telemetry sink, or
+  public-internet listener in this checkpoint.
 - Discarding the private `net/http` panic log does not constrain logging by a
   front proxy, the operating system, the upstream, or future telemetry code.

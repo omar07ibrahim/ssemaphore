@@ -123,6 +123,18 @@ func TestValidateConfigAcceptsTimeoutBoundaries(t *testing.T) {
 	}
 }
 
+func TestValidateConfigProvidesResourceFreePreflight(t *testing.T) {
+	config, policy := validConfigAndPolicy()
+	if err := ValidateConfig(config, policy); err != nil {
+		t.Fatalf("ValidateConfig() error = %v", err)
+	}
+
+	config.MaxConnections = 0
+	if err := ValidateConfig(config, policy); err == nil {
+		t.Fatal("ValidateConfig() error = nil for invalid connection limit")
+	}
+}
+
 func TestValidateConfigRejectsTimeoutsOutsideBounds(t *testing.T) {
 	tests := []struct {
 		name   string
