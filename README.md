@@ -6,13 +6,14 @@ turns tenant weights, bounded estimated work, queue deadlines, and client
 disconnects into explicit lifecycle decisions before an inference upstream is
 overloaded.
 
-> **Status:** the strict non-streaming request boundary is implemented. The
-> scheduler, HTTP handler, and upstream relay have not landed, so there is no
-> runnable gateway yet.
+> **Status:** the strict non-streaming request boundary and bounded admission
+> scheduler are implemented. The HTTP handler and upstream relay have not
+> landed, so there is no runnable gateway yet.
 
 ## Implemented now
 
-The Go request parser already enforces the first proof boundary:
+The Go request parser and admission scheduler enforce the first two proof
+boundaries:
 
 - a 16 MiB hard body ceiling above the lower operator-configured limit;
 - raw invalid UTF-8, unpaired Unicode surrogates, duplicate keys at any depth,
@@ -22,6 +23,20 @@ The Go request parser already enforces the first proof boundary:
 - validated requests keep an exact-capacity body and expose only copy or
   read-only accessors;
 - table, race, 32-bit, and corpus-seeded fuzz tests cover the parser boundary.
+
+The scheduler adds:
+
+- startup validation for every queue, in-flight, quantum, deficit, tenant, and
+  scheduler-work bound, including hard caps on collection and funding work;
+- tenant-first and global queue decisions over count, exact body bytes, and
+  estimated work, followed by count-and-work in-flight enforcement;
+- config-order, per-tenant FIFO weighted DRR with carried bounded deficit and a
+  funded-head barrier that prevents small requests starving a large request
+  when global work capacity is fragmented;
+- absolute queue deadlines fixed before mailbox admission, client-cancellation
+  attribution, exact-once accounting release, and graceful-then-forced drain;
+- golden traces, an independent seeded DRR oracle, adversarial fragmentation
+  tests, deterministic fake-clock races, race detection, and 32-bit tests.
 
 Streaming is deliberately rejected by this first implementation slice. The
 target v0.1 contract below remains broader than the code that exists today.
