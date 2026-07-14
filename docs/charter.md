@@ -5,10 +5,10 @@ support. A feature is out of scope unless it strengthens bounded admission,
 request lifecycle correctness, or the observability of those decisions.
 
 > **Implementation checkpoint:** the request contract, admission scheduler,
-> and injected non-streaming HTTP lifecycle are implemented. The repository
-> does not yet contain a runnable server, real upstream HTTP transport,
-> streaming relay, telemetry, or restart journal. Controls below that depend
-> on those components remain release targets rather than current claims.
+> injected non-streaming HTTP lifecycle, and fixed-destination upstream HTTP
+> transport are implemented. The repository does not yet contain a runnable
+> server, streaming relay, telemetry, or restart journal. Controls below that
+> depend on those components remain release targets rather than current claims.
 
 ## Product claim
 
@@ -166,6 +166,15 @@ that permit.
 v0.1 performs no automatic retry. This makes the most important boundary easy
 to audit: an upstream request is attempted at most once, and a response is
 never replayed after the first downstream byte.
+
+The implemented transport makes that promise mechanical: it enables HTTP/1
+only, sends a POST body without `GetBody`, and disables redirects. Go therefore
+cannot replay the request after a reused connection fails. The fixed client
+also disables environment proxies and transparent decompression, and applies
+finite connect, TLS-handshake, response-header, idle-connection, header-byte,
+and connection-count bounds beneath the handler's total upstream deadline.
+Address candidates are dialed sequentially so one counted dial cannot open two
+TCP sockets through fast fallback.
 
 The implemented non-streaming path reads at most the configured response limit
 plus one byte, validates one JSON object whose `object` field is exactly

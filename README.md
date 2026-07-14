@@ -7,8 +7,8 @@ disconnects into explicit lifecycle decisions before an inference upstream is
 overloaded.
 
 > **Status:** the strict non-streaming request boundary, bounded admission
-> scheduler, and authenticated injected HTTP lifecycle are implemented. A real
-> upstream transport and runnable server have not landed, so there is no
+> scheduler, authenticated HTTP lifecycle, and fixed-destination upstream
+> transport are implemented. A runnable server has not landed, so there is no
 > deployable gateway yet.
 
 ## Implemented now
@@ -58,11 +58,29 @@ The non-streaming HTTP lifecycle adds:
   saturation, malformed upstreams, timeout, short writes, panic cleanup, race
   detection, and 32-bit arithmetic.
 
-Streaming is deliberately rejected by this implementation slice. The real
-fixed-destination HTTP transport, server connection/header/write bounds,
-signal-driven drain, telemetry, journal, and restart reconciliation are also
-still target work. The v0.1 contract below remains broader than the code that
-exists today.
+The real upstream transport adds:
+
+- one startup-validated Chat Completions URL, with plaintext permitted only for
+  numeric loopback destinations and TLS 1.2 or newer everywhere else;
+- a separate upstream bearer credential that cannot be supplied by a client or
+  represented by the transport policy value;
+- explicitly disabled redirects, environment proxies, transparent compression,
+  cookies, and all HTTP/2 modes;
+- finite connect, TLS-handshake, response-header, idle-connection, header-byte,
+  and connection-count bounds, with sequential address dialing and the
+  handler's total upstream deadline;
+- an HTTP/1-only, non-replayable POST so Go's transport cannot automatically
+  retry expensive inference work;
+- a value-free transport context that preserves cancellation and deadlines but
+  prevents caller-installed trace hooks from observing the upstream credential;
+- loopback wire tests for exact outbound bytes and headers, cancellation,
+  timeouts, oversized headers, redirects, compression, connection bounds and
+  reuse, and credential isolation.
+
+Streaming is deliberately rejected by this implementation slice. Runnable
+server connection/header/write bounds, signal-driven drain, telemetry, journal,
+and restart reconciliation are also still target work. The v0.1 contract below
+remains broader than the code that exists today.
 
 ## The research question
 
@@ -86,7 +104,7 @@ client
 
 The v0.1 target is intentionally not a provider broker or a generic reverse
 proxy. Its value is the failure behavior: deterministic admission, typed
-rejection, cancellation propagation, no retry after response commitment,
+rejection, cancellation propagation, no automatic upstream retry,
 privacy-safe telemetry, and restart reconciliation.
 
 ## Target v0.1 boundary

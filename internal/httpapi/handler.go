@@ -228,6 +228,13 @@ func (h *Handler) serve(sink *responseSink, request *http.Request) {
 		outcome = contextOutcome
 		return
 	}
+	if errors.Is(upstreamErr, ErrUpstreamTimeout) {
+		outcome = admission.ServingUpstreamFailed
+		if sink.writeError(errUpstreamTimeout) != nil {
+			outcome = admission.ServingDownstreamFailed
+		}
+		return
+	}
 	if upstreamErr != nil || !validUpstreamMetadata(response) {
 		outcome = admission.ServingUpstreamFailed
 		if sink.writeError(errBadUpstream) != nil {
