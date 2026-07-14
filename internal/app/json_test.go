@@ -77,6 +77,8 @@ func TestDecodePolicyJSONRejectsInvalidDocuments(t *testing.T) {
 		{name: "nested duplicate key", data: []byte(`{"nested":{"enabled":true,"enabled":false}}`), destination: &policyJSONFixture{}},
 		{name: "array nested duplicate key", data: []byte(`{"items":[{"enabled":true,"enabled":false}]}`), destination: &policyJSONFixture{}},
 		{name: "unknown field", data: []byte(`{"unknown_canary_secret":"value_canary_secret"}`), destination: &policyJSONFixture{}},
+		{name: "wrong case field", data: []byte(`{"Count":1}`), destination: &policyJSONFixture{}},
+		{name: "wrong case nested field", data: []byte(`{"nested":{"Enabled":true}}`), destination: &policyJSONFixture{}},
 		{name: "trailing object", data: []byte(`{} {}`), destination: &policyJSONFixture{}},
 		{name: "trailing scalar", data: []byte(`{} 1`), destination: &policyJSONFixture{}},
 		{name: "high surrogate alone", data: []byte(`{"name":"\uD800"}`), destination: &policyJSONFixture{}},

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"reflect"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -32,6 +34,13 @@ func decodePolicyJSON(data []byte, destination any) error {
 		return errPolicyInvalid
 	}
 
+	var shape any
+	decoder = json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&shape); err != nil || !exactPolicyJSONFields(shape, reflect.TypeOf(destination)) {
+		return errPolicyInvalid
+	}
+
 	decoder = json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	decoder.UseNumber()
@@ -42,6 +51,75 @@ func decodePolicyJSON(data []byte, destination any) error {
 		return errPolicyInvalid
 	}
 	return nil
+}
+
+func exactPolicyJSONFields(value any, destinationType reflect.Type) bool {
+	if destinationType == nil {
+		return false
+	}
+	for destinationType.Kind() == reflect.Pointer {
+		destinationType = destinationType.Elem()
+	}
+	if value == nil || destinationType.Kind() == reflect.Interface {
+		return true
+	}
+
+	switch destinationType.Kind() {
+	case reflect.Struct:
+		object, ok := value.(map[string]any)
+		if !ok {
+			return true // The typed decoder reports the wrong JSON kind.
+		}
+		fields := make(map[string]reflect.Type, destinationType.NumField())
+		for index := 0; index < destinationType.NumField(); index++ {
+			field := destinationType.Field(index)
+			if !field.IsExported() || field.Anonymous {
+				continue
+			}
+			name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+			if name == "-" {
+				continue
+			}
+			if name == "" {
+				name = field.Name
+			}
+			fields[name] = field.Type
+		}
+		for name, member := range object {
+			fieldType, exists := fields[name]
+			if !exists || !exactPolicyJSONFields(member, fieldType) {
+				return false
+			}
+		}
+		return true
+	case reflect.Slice, reflect.Array:
+		if destinationType.Kind() == reflect.Slice && destinationType.Elem().Kind() == reflect.Uint8 {
+			return true
+		}
+		array, ok := value.([]any)
+		if !ok {
+			return true // The typed decoder reports the wrong JSON kind.
+		}
+		for _, member := range array {
+			if !exactPolicyJSONFields(member, destinationType.Elem()) {
+				return false
+			}
+		}
+		return true
+	case reflect.Map:
+		object, ok := value.(map[string]any)
+		if !ok || destinationType.Key().Kind() != reflect.String {
+			return true
+		}
+		for _, member := range object {
+			if !exactPolicyJSONFields(member, destinationType.Elem()) {
+				return false
+			}
+		}
+		return true
+	default:
+		return true
+	}
 }
 
 func scanPolicyValue(decoder *json.Decoder, depth int) bool {
