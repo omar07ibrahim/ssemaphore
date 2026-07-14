@@ -99,6 +99,19 @@ func TestValidateConfigCopiesTenantOrder(t *testing.T) {
 	}
 }
 
+func TestValidateConfigProvidesGoroutineFreePreflight(t *testing.T) {
+	t.Parallel()
+	config := baseConfig()
+	if err := ValidateConfig(config); err != nil {
+		t.Fatalf("ValidateConfig() error = %v", err)
+	}
+
+	config.BaseQuantum = 0
+	if err := ValidateConfig(config); err == nil {
+		t.Fatal("ValidateConfig() error = nil for invalid quantum")
+	}
+}
+
 func TestValidateAdmission(t *testing.T) {
 	t.Parallel()
 	config, err := validateConfig(baseConfig())

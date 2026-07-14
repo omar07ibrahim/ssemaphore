@@ -34,6 +34,14 @@ type validatedTenant struct {
 	inflight InflightLimits
 }
 
+// ValidateConfig checks every scheduler resource and CPU bound without
+// starting the scheduler owner goroutine. New repeats this validation before
+// constructing runtime state.
+func ValidateConfig(config Config) error {
+	_, err := validateConfig(config)
+	return err
+}
+
 func validateConfig(config Config) (validatedConfig, error) {
 	if config.MaxBodyBytes == 0 {
 		return validatedConfig{}, errors.New("maximum body bytes must be positive")
