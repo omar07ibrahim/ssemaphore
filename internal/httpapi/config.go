@@ -34,15 +34,63 @@ type validatedHandlerConfig struct {
 	credentials         []storedCredential
 }
 
+type schedulerPolicy interface {
+	MaxBodyBytes() uint64
+	MaxRequestUnits() uint64
+	GlobalQueueLimits() admission.QueueLimits
+	TenantQueueLimits(admission.TenantID) (admission.QueueLimits, bool)
+}
+
+type configuredSchedulerPolicy struct {
+	maxBodyBytes    uint64
+	maxRequestUnits uint64
+	globalQueue     admission.QueueLimits
+	tenantQueues    map[admission.TenantID]admission.QueueLimits
+}
+
+// ValidateConfig checks the complete HTTP policy against a validated parser
+// and scheduler policy without constructing a scheduler goroutine or retaining
+// credentials. NewHandler repeats the same validation against the live
+// scheduler before accepting work.
+func ValidateConfig(config Config, parser *contract.Parser, schedulerConfig admission.Config) error {
+	if err := admission.ValidateConfig(schedulerConfig); err != nil {
+		return errors.New("admission policy is invalid")
+	}
+	policy := configuredSchedulerPolicy{
+		maxBodyBytes:    schedulerConfig.MaxBodyBytes,
+		maxRequestUnits: schedulerConfig.MaxRequestUnits,
+		globalQueue:     schedulerConfig.GlobalQueue,
+		tenantQueues:    make(map[admission.TenantID]admission.QueueLimits, len(schedulerConfig.Tenants)),
+	}
+	for _, tenant := range schedulerConfig.Tenants {
+		policy.tenantQueues[tenant.ID] = tenant.Queue
+	}
+	_, err := validateHandlerConfig(config, parser, policy)
+	return err
+}
+
+func (p configuredSchedulerPolicy) MaxBodyBytes() uint64 { return p.maxBodyBytes }
+
+func (p configuredSchedulerPolicy) MaxRequestUnits() uint64 { return p.maxRequestUnits }
+
+func (p configuredSchedulerPolicy) GlobalQueueLimits() admission.QueueLimits {
+	return p.globalQueue
+}
+
+func (p configuredSchedulerPolicy) TenantQueueLimits(id admission.TenantID) (admission.QueueLimits, bool) {
+	queue, exists := p.tenantQueues[id]
+	return queue, exists
+}
+
 func validateHandlerConfig(
 	config Config,
 	parser *contract.Parser,
-	scheduler *admission.Scheduler,
+	scheduler schedulerPolicy,
 ) (validatedHandlerConfig, error) {
 	if parser == nil {
 		return validatedHandlerConfig{}, errors.New("request parser must not be nil")
 	}
-	if scheduler == nil {
+	if scheduler == nil || nilAdmissionScheduler(scheduler) {
 		return validatedHandlerConfig{}, errors.New("admission scheduler must not be nil")
 	}
 	if parser.MaxBodyBytes() != scheduler.MaxBodyBytes() {
@@ -148,6 +196,11 @@ func validateHandlerConfig(
 		tenantSlots:         tenantSlots,
 		credentials:         credentials,
 	}, nil
+}
+
+func nilAdmissionScheduler(policy schedulerPolicy) bool {
+	scheduler, concrete := policy.(*admission.Scheduler)
+	return concrete && scheduler == nil
 }
 
 func validatePolicyTimeout(name string, value, maximum time.Duration) error {

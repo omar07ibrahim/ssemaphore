@@ -64,6 +64,20 @@ func TestNewHandlerRejectsNilAndMismatchedIntegrationLimits(t *testing.T) {
 	})
 }
 
+func TestValidateConfigProvidesSchedulerFreePreflight(t *testing.T) {
+	parser := configTestNewParser(t, configTestMaxBodyBytes, configTestMaxRequestUnits)
+	schedulerConfig := configTestSchedulerConfig()
+	config := configTestBaseHandlerConfig()
+	if err := ValidateConfig(config, parser, schedulerConfig); err != nil {
+		t.Fatalf("ValidateConfig() error = %v", err)
+	}
+
+	config.GlobalPreDispatchLimit = 0
+	if err := ValidateConfig(config, parser, schedulerConfig); err == nil {
+		t.Fatal("ValidateConfig() error = nil for zero pre-dispatch bound")
+	}
+}
+
 func TestValidateHandlerConfigRejectsTimeoutAndResponseBounds(t *testing.T) {
 	parser := configTestNewParser(t, configTestMaxBodyBytes, configTestMaxRequestUnits)
 	scheduler := configTestNewScheduler(t, nil)
@@ -365,7 +379,26 @@ func configTestNewParser(t *testing.T, maxBodyBytes, maxRequestUnits uint64) *co
 
 func configTestNewScheduler(t *testing.T, mutate func(*admission.Config)) *admission.Scheduler {
 	t.Helper()
-	config := admission.Config{
+	config := configTestSchedulerConfig()
+	if mutate != nil {
+		mutate(&config)
+	}
+	scheduler, err := admission.New(config)
+	if err != nil {
+		t.Fatalf("admission.New() error = %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := scheduler.Close(ctx); err != nil {
+			t.Errorf("Scheduler.Close() error = %v", err)
+		}
+	})
+	return scheduler
+}
+
+func configTestSchedulerConfig() admission.Config {
+	return admission.Config{
 		MaxBodyBytes:    configTestMaxBodyBytes,
 		MaxRequestUnits: configTestMaxRequestUnits,
 		BaseQuantum:     configTestMaxRequestUnits,
@@ -402,19 +435,4 @@ func configTestNewScheduler(t *testing.T, mutate func(*admission.Config)) *admis
 			},
 		},
 	}
-	if mutate != nil {
-		mutate(&config)
-	}
-	scheduler, err := admission.New(config)
-	if err != nil {
-		t.Fatalf("admission.New() error = %v", err)
-	}
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		if err := scheduler.Close(ctx); err != nil {
-			t.Errorf("Scheduler.Close() error = %v", err)
-		}
-	})
-	return scheduler
 }
