@@ -6,9 +6,9 @@ inference upstream.
 
 > **Current checkpoint:** strict request parsing, bounded admission, bearer to
 > tenant mapping, pre-dispatch slots, and an injected non-streaming lifecycle
-> are implemented. There is no runnable server or real upstream transport yet.
-> Connection/header/write deadlines, fixed destination and proxy policy, SSE,
-> telemetry, and persistence below remain target controls.
+> are implemented together with a fixed-destination upstream HTTP transport.
+> There is no runnable server yet. Inbound connection/header/write deadlines,
+> SSE, telemetry, and persistence below remain target controls.
 
 ## Assets
 
@@ -79,13 +79,20 @@ A client may try to forward its bearer token, select a new upstream, inject
 hop-by-hop headers, or use proxy-related environment variables.
 
 Implemented controls: client credentials terminate at ingress, only SHA-256
-digests are retained after construction, credentials map immutably to a
-configured tenant, exact paths cannot contain an authority or query, and the
-injected upstream receives no inbound header, credential, URL, or response
-writer. The real-transport milestone must separately load an upstream
-credential, validate one fixed URL, disable redirects and environment proxies,
-disable transparent compression, and construct outbound headers from an
-allowlist.
+digests of those tenant credentials are retained after construction,
+credentials map immutably to a configured tenant, exact paths cannot contain an
+authority or query, and the injected upstream receives no inbound header,
+credential, URL, or response writer. The concrete transport accepts its
+upstream credential separately from its serializable policy, validates one
+fixed URL, permits plaintext only to a numeric loopback address, disables
+redirects and environment proxies, disables transparent compression, and
+constructs outbound headers from an allowlist.
+The raw upstream credential must remain in the private transport object for the
+lifetime of that client because every request needs it; it is never returned in
+an error or included in the policy value. The outbound request context retains
+the caller's cancellation and deadline but drops caller values, preventing an
+installed `httptrace` callback from observing the authorization header or
+blocking a transport callback.
 
 ### Slow, malformed, or malicious upstream
 
@@ -97,9 +104,12 @@ Implemented non-streaming controls: one finite upstream deadline; exact status,
 content-type, and content-encoding checks; a 16 MiB hard response ceiling above
 the lower configured limit; UTF-8, Unicode escape, nesting, duplicate-key,
 trailing-value, and exact object checks; full validation before commitment; no
-upstream response headers; one terminal cleanup owner; and no retry. Connect,
-response-header, SSE idle/event/stream, transport compression, and redirect
-controls remain part of the real transport and streaming milestones.
+upstream response headers; one terminal cleanup owner; and no retry. The
+transport additionally bounds connect, TLS-handshake, response-header,
+idle-connection, header-byte, and connection-count resources; disables
+parallel IPv4/IPv6 fallback, redirects, and decompression; and requires TLS 1.2
+or newer for every HTTPS connection. SSE idle, event, and total-stream controls
+remain part of the streaming milestone.
 
 ### Client disconnects and slow readers
 
@@ -120,10 +130,13 @@ HTTP cancellation.
 An automatic retry can duplicate expensive work, and a gateway cannot replace
 an HTTP status after the first response byte.
 
-Controls: v0.1 attempts the upstream exactly once. State records whether the
-response was committed. Before commitment, failures use the documented JSON
-envelope; after commitment, upstream is canceled and the connection closes
-without a synthetic `[DONE]`; only a private terminal reason is recorded.
+Controls: v0.1 attempts the upstream exactly once. The concrete transport is
+HTTP/1-only and sends a non-replayable POST body with no `GetBody` function, so
+Go cannot retry it after a stale connection or protocol failure. Redirects are
+also disabled. State records whether the response was committed. Before
+commitment, failures use the documented JSON envelope; after commitment,
+upstream is canceled and the connection closes without a synthetic `[DONE]`;
+only a private terminal reason is recorded.
 
 ### Content and credential leakage
 

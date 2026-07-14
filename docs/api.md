@@ -16,9 +16,10 @@ Authorization: Bearer <tenant credential>
 
 Other methods and paths fail without contacting the upstream. Client bearer
 credentials select a configured immutable tenant and are never forwarded. No
-header or JSON field can override that identity. The current injected upstream
-receives neither the client credential nor any destination. A later real
-transport will use a separate operator credential for one fixed upstream.
+header or JSON field can override that identity. The handler passes only the
+validated JSON body to its upstream interface. The implemented HTTP transport
+uses a separate operator credential and one startup-validated absolute
+destination ending in exactly `/v1/chat/completions`.
 
 An optional `X-SSEmaphore-Queue-Timeout-Ms` header may request a queue timeout
 shorter than the configured default. It is a positive bounded decimal integer
@@ -76,9 +77,21 @@ events, `chat.completion.chunk` payloads, and a terminal `[DONE]` marker.
 
 The implemented non-streaming handler relays no upstream headers. It sets only
 its own `Content-Type`, exact `Content-Length`, `Cache-Control`,
-`X-Content-Type-Options`, and `X-Request-Id`. Redirect, environment proxy,
-transparent compression, and fixed-destination rules belong to the not-yet-
-implemented real HTTP transport.
+`X-Content-Type-Options`, and `X-Request-Id`. The upstream client constructs
+only the `Accept`, `Authorization`, `Content-Type`, and `User-Agent` application
+headers; it never copies inbound headers. Redirects, environment proxies,
+cookies, and transparent compression are disabled. Plaintext destinations must
+be numeric loopback addresses; other destinations require HTTPS with TLS 1.2
+or newer.
+
+The upstream transport deliberately offers HTTP/1 only. Its POST body has no
+replay function, which prevents Go's transport from automatically retrying a
+request. Connect, TLS-handshake, response-header, idle-connection, header-byte,
+and connection-count limits are finite, while the handler context supplies the
+total upstream deadline. Cancellation and deadlines cross that boundary, but
+arbitrary context values do not; this prevents caller-installed HTTP trace
+hooks from observing the upstream credential. This is still a library
+checkpoint: no runnable HTTP server accepts connections yet.
 
 ## Errors before response commitment
 
