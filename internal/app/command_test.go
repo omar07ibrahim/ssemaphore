@@ -438,7 +438,7 @@ func TestMainHelpHasNoEnvironmentOrSignalSideEffects(t *testing.T) {
 func commandTestRunServeLifecycle(t *testing.T, cleanSignal bool) {
 	t.Helper()
 	const canary = "SERVE_LIFECYCLE_PRIVATE_CANARY"
-	port := commandTestReserveLoopbackPort(t)
+	reservation, port := commandTestReserveLoopbackListener(t)
 	document := canonicalPolicyDocument()
 	document.Listener.Host = "127.0.0.1"
 	document.Listener.Port = uint64(port)
@@ -466,9 +466,8 @@ func commandTestRunServeLifecycle(t *testing.T, cleanSignal bool) {
 				Zone: address.Zone,
 			}
 		}
-		listener, err := net.ListenTCP(network, address)
-		ownedListener = listener
-		return listener, err
+		ownedListener = reservation
+		return reservation, nil
 	}
 
 	var stdout bytes.Buffer
@@ -542,7 +541,7 @@ func commandTestRunServeLifecycle(t *testing.T, cleanSignal bool) {
 	}
 }
 
-func commandTestReserveLoopbackPort(t *testing.T) uint16 {
+func commandTestReserveLoopbackListener(t *testing.T) (*net.TCPListener, uint16) {
 	t.Helper()
 	reservation, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	if err != nil {
@@ -553,11 +552,10 @@ func commandTestReserveLoopbackPort(t *testing.T) uint16 {
 		_ = reservation.Close()
 		t.Fatalf("reserved address = %#v, want bounded TCP port", reservation.Addr())
 	}
-	port := uint16(address.Port)
-	if err := reservation.Close(); err != nil {
-		t.Fatalf("close loopback port reservation: %v", err)
-	}
-	return port
+	t.Cleanup(func() {
+		_ = reservation.Close()
+	})
+	return reservation, uint16(address.Port)
 }
 
 func commandTestSecrets(canary string) *fakeSecretSource {
