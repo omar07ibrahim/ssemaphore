@@ -6,8 +6,25 @@ turns tenant weights, bounded estimated work, queue deadlines, and client
 disconnects into explicit lifecycle decisions before an inference upstream is
 overloaded.
 
-> **Status:** contract only. The implementation has not landed yet. This
-> repository is not ready to run or deploy.
+> **Status:** the strict non-streaming request boundary is implemented. The
+> scheduler, HTTP handler, and upstream relay have not landed, so there is no
+> runnable gateway yet.
+
+## Implemented now
+
+The Go request parser already enforces the first proof boundary:
+
+- a 16 MiB hard body ceiling above the lower operator-configured limit;
+- raw invalid UTF-8, unpaired Unicode surrogates, duplicate keys at any depth,
+  trailing values, unknown fields, and non-decimal integers fail closed;
+- message count, decoded text bytes, completion tokens, and checked reservation
+  arithmetic are independently bounded;
+- validated requests keep an exact-capacity body and expose only copy or
+  read-only accessors;
+- table, race, 32-bit, and corpus-seeded fuzz tests cover the parser boundary.
+
+Streaming is deliberately rejected by this first implementation slice. The
+target v0.1 contract below remains broader than the code that exists today.
 
 ## The research question
 

@@ -109,6 +109,7 @@ The stable v0 codes are:
 | `413` | `request_too_large` | A configured ingress limit was crossed. |
 | `415` | `unsupported_media_type` | The request is not JSON. |
 | `429` | `tenant_capacity_exhausted` | A tenant request, byte, or work limit is exhausted. |
+| `500` | `internal_error` | An internal invariant or required server capability failed. |
 | `502` | `upstream_invalid` | Upstream failed before a response was committed. |
 | `503` | `overloaded` | A global request, byte, or work limit is exhausted. |
 | `503` | `queue_deadline_exceeded` | The request expired before upstream dispatch. |

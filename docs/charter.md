@@ -52,7 +52,11 @@ is versioned independently.
 
 ## Resource model
 
-Every configured limit is finite and checked before allocation or arithmetic:
+Every configured limit is finite and validated before the process listens. A
+16 MiB hard request-body ceiling is the allocation envelope for parsing;
+operators may configure a lower limit but not a higher one. Semantic limits are
+enforced during that bounded decode before queue admission, and all reservation
+arithmetic is checked before accounting changes:
 
 - accepted connections, request headers, header-read time, and body-read time;
 - request body bytes;
@@ -82,6 +86,11 @@ count or a prediction of GPU time.
 
 Actual token usage, when supplied by the upstream, is recorded separately as
 bounded telemetry. It never rewrites a scheduling decision after the fact.
+
+The queued-body counter measures the exact retained raw JSON bytes, not total
+Go heap usage. Decoded messages are separately bounded by the body envelope,
+message-count limit, and queued-request limit. Published load evidence reports
+RSS instead of presenting the raw-body counter as a memory measurement.
 
 ## Admission and scheduling
 
