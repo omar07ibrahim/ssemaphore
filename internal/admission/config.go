@@ -12,7 +12,9 @@ const (
 	absoluteMaxQueuedRequests   = 65_536
 	absoluteMaxInflightRequests = 4_096
 	maxFundingVisits            = 65_536
-	maxQueueTimeout             = time.Hour
+
+	// MaximumQueueTimeout is the longest queue residence accepted by a Scheduler.
+	MaximumQueueTimeout = time.Hour
 )
 
 type validatedConfig struct {
@@ -161,7 +163,7 @@ func validateAdmission(config validatedConfig, admission Admission) Decision {
 	if admission.WorkUnits == 0 || admission.WorkUnits > config.maxRequestUnits {
 		return Decision{Kind: DecisionInvalid, Resource: ResourceWork}
 	}
-	if admission.QueueTimeout <= 0 || admission.QueueTimeout > maxQueueTimeout {
+	if admission.QueueTimeout <= 0 || admission.QueueTimeout > MaximumQueueTimeout {
 		return Decision{Kind: DecisionInvalid, Resource: ResourceNone}
 	}
 	if _, exists := config.tenantByID[admission.Tenant]; !exists {

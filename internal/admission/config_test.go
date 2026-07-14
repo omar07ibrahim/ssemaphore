@@ -118,7 +118,8 @@ func TestValidateAdmission(t *testing.T) {
 		{name: "zero work", admission: Admission{Tenant: 1, BodyBytes: 1, QueueTimeout: 1}, want: Decision{Kind: DecisionInvalid, Resource: ResourceWork}},
 		{name: "work over limit", admission: Admission{Tenant: 1, BodyBytes: 1, WorkUnits: 101, QueueTimeout: 1}, want: Decision{Kind: DecisionInvalid, Resource: ResourceWork}},
 		{name: "zero timeout", admission: Admission{Tenant: 1, BodyBytes: 1, WorkUnits: 1}, want: Decision{Kind: DecisionInvalid}},
-		{name: "timeout over limit", admission: Admission{Tenant: 1, BodyBytes: 1, WorkUnits: 1, QueueTimeout: maxQueueTimeout + 1}, want: Decision{Kind: DecisionInvalid}},
+		{name: "maximum timeout", admission: Admission{Tenant: 1, BodyBytes: 1, WorkUnits: 1, QueueTimeout: MaximumQueueTimeout}, want: Decision{}},
+		{name: "timeout over limit", admission: Admission{Tenant: 1, BodyBytes: 1, WorkUnits: 1, QueueTimeout: MaximumQueueTimeout + 1}, want: Decision{Kind: DecisionInvalid}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
