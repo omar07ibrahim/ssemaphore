@@ -476,6 +476,20 @@ func TestLoadPolicyAcceptsPrivateFixtureAndRejectsInvalidFiles(t *testing.T) {
 	}
 }
 
+func TestCommittedExamplePolicyRemainsValid(t *testing.T) {
+	data, err := os.ReadFile("../../configs/policy.example.json")
+	if err != nil {
+		t.Fatalf("read committed policy example: %v", err)
+	}
+	policy, err := parsePolicy(data)
+	if err != nil {
+		t.Fatalf("parse committed policy example: %v", err)
+	}
+	if policy == nil {
+		t.Fatal("committed policy example produced a nil policy")
+	}
+}
+
 func assertPolicyRejected(t *testing.T, data []byte) {
 	t.Helper()
 	policy, err := parsePolicy(data)

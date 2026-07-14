@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "listener": {
+    "type": "tcp",
+    "host": "127.0.0.1",
+    "port": 18080
+  },
+  "contract": {
+    "public_model": "portfolio-model",
+    "max_body_bytes": 1048576,
+    "max_message_count": 64,
+    "max_message_text_bytes": 262144,
+    "max_completion_tokens": 4096,
+    "completion_weight": 256,
+    "max_request_units": 2097152
+  },
+  "admission": {
+    "base_quantum": 262144,
+    "deficit_cap": 2621439,
+    "global_queue": {
+      "count": 64,
+      "bytes": 67108864,
+      "work": 134217728
+    },
+    "global_inflight": {
+      "count": 8,
+      "work": 16777216
+    },
+    "tenants": [
+      {
+        "id": 1,
+        "weight": 1,
+        "queue": {
+          "count": 32,
+          "bytes": 33554432,
+          "work": 67108864
+        },
+        "inflight": {
+          "count": 4,
+          "work": 8388608
+        },
+        "pre_dispatch_count": 8,
+        "bearer_token_envs": [
+          "SSEMAPHORE_TENANT_1_TOKEN"
+        ]
+      },
+      {
+        "id": 2,
+        "weight": 2,
+        "queue": {
+          "count": 16,
+          "bytes": 16777216,
+          "work": 33554432
+        },
+        "inflight": {
+          "count": 2,
+          "work": 4194304
+        },
+        "pre_dispatch_count": 4,
+        "bearer_token_envs": [
+          "SSEMAPHORE_TENANT_2_TOKEN"
+        ]
+      }
+    ]
+  },
+  "http": {
+    "default_queue_timeout_ms": 5000,
+    "body_read_timeout_ms": 10000,
+    "upstream_timeout_ms": 120000,
+    "max_response_body_bytes": 8388608,
+    "global_pre_dispatch_count": 16
+  },
+  "upstream": {
+    "endpoint": "https://api.example.com/v1/chat/completions",
+    "bearer_token_env": "SSEMAPHORE_UPSTREAM_BEARER_TOKEN",
+    "connect_timeout_ms": 3000,
+    "tls_handshake_timeout_ms": 5000,
+    "response_header_timeout_ms": 60000,
+    "idle_connection_timeout_ms": 30000,
+    "max_response_header_bytes": 65536,
+    "max_connections": 8
+  },
+  "server": {
+    "header_read_timeout_ms": 2000,
+    "response_write_timeout_ms": 15000,
+    "idle_timeout_ms": 30000,
+    "grace_timeout_ms": 30000,
+    "force_timeout_ms": 5000,
+    "header_read_envelope_bytes": 16384,
+    "max_connections": 64
+  }
+}

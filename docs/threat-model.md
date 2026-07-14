@@ -5,11 +5,10 @@ the gateway can prove from properties that remain owned by its deployment or
 inference upstream.
 
 > **Current checkpoint:** strict request parsing, bounded admission, bearer to
-> tenant mapping, pre-dispatch slots, and an injected non-streaming lifecycle
-> are implemented together with fixed-destination upstream transport and a
-> bounded inbound HTTP server lifecycle. There is no runnable command yet.
-> Configuration loading, signal wiring, SSE, telemetry, and persistence below
-> remain target controls.
+> tenant mapping, pre-dispatch slots, fixed-destination upstream transport,
+> bounded inbound HTTP serving, strict Linux policy loading, loopback listener
+> selection, and signal-owned invocation are implemented as one runnable path.
+> SSE, telemetry, and persistence below remain target controls.
 
 ## Assets
 
@@ -97,6 +96,14 @@ an error or included in the policy value. The outbound request context retains
 the caller's cancellation and deadline but drops caller values, preventing an
 installed `httptrace` callback from observing the authorization header or
 blocking a transport callback.
+
+The executable policy contains environment-variable names rather than token
+values. It is read only from an effective-user-owned regular file with exact
+mode `0600`; ambiguous JSON, symlinks, special files, unsafe ancestors, and
+file-size changes fail closed. Every configured variable is read once and
+unset in the child process before bind. Resolved tenant and upstream values
+must all differ. Unsetting and overwriting Go string fields reduce accidental
+inheritance and retention but are not memory-erasure or `/proc` guarantees.
 
 ### Slow, malformed, or malicious upstream
 
