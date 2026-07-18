@@ -15,7 +15,7 @@ func (p *Parser) decodeRequest(ctx context.Context, body []byte) (Request, Reaso
 		return Request{}, ReasonRootNotObject
 	}
 
-	request := Request{}
+	request := Request{mode: RequestModeNonStreaming}
 	var modelSet, messagesSet, completionSet bool
 	for decoder.More() {
 		keyToken, keyErr := decoder.Token()
@@ -62,7 +62,7 @@ func (p *Parser) decodeRequest(ctx context.Context, body []byte) (Request, Reaso
 				return Request{}, reason
 			}
 			if stream {
-				return Request{}, ReasonUnsupportedValue
+				request.mode = RequestModeStreaming
 			}
 		case "stream_options":
 			return Request{}, ReasonUnsupportedValue

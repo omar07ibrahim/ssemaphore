@@ -250,11 +250,31 @@ type Message struct {
 	Content string
 }
 
-// Request is a validated non-streaming request. Body is the exact bounded JSON
+// RequestMode is the validated response mode selected by a request.
+type RequestMode uint8
+
+const (
+	RequestModeNonStreaming RequestMode = iota + 1
+	RequestModeStreaming
+)
+
+func (m RequestMode) String() string {
+	switch m {
+	case RequestModeNonStreaming:
+		return "non_streaming"
+	case RequestModeStreaming:
+		return "streaming"
+	default:
+		return "unknown"
+	}
+}
+
+// Request is one validated request. Body is the exact bounded JSON
 // representation received from the client and is retained only for dispatch.
 type Request struct {
 	model               string
 	messages            []Message
+	mode                RequestMode
 	maxCompletionTokens uint64
 	bodyBytes           uint64
 	messageTextBytes    uint64
@@ -266,6 +286,8 @@ func (r Request) Model() string { return r.model }
 
 // Messages returns a copy so callers cannot mutate the validated request.
 func (r Request) Messages() []Message { return slices.Clone(r.messages) }
+
+func (r Request) Mode() RequestMode { return r.mode }
 
 func (r Request) MaxCompletionTokens() uint64 { return r.maxCompletionTokens }
 
@@ -304,8 +326,8 @@ func (r *requestBodyReader) Read(destination []byte) (int, error) {
 	return n, nil
 }
 
-// Parse reads at most MaxBodyBytes+1 bytes and validates the non-streaming v0
-// request subset. Cancellation is checked around reads; an HTTP handler must
+// Parse reads at most MaxBodyBytes+1 bytes and validates the v0 request
+// subset. Cancellation is checked around reads; an HTTP handler must
 // still close a blocked request body when its context is canceled.
 func (p *Parser) Parse(ctx context.Context, r io.Reader) (Request, error) {
 	if ctx == nil {

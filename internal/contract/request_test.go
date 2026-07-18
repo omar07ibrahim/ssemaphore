@@ -88,13 +88,14 @@ func parseReason(t *testing.T, parser *Parser, body []byte) (ErrorClass, Reason)
 	return parseErr.Class(), parseErr.Reason()
 }
 
-func TestParseAcceptsNonStreamingSubset(t *testing.T) {
+func TestParseAcceptsRequestSubset(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
 		body           string
 		wantRoles      []Role
+		wantMode       RequestMode
 		wantTextBytes  uint64
 		wantTokens     uint64
 		oneByteAtATime bool
@@ -103,6 +104,7 @@ func TestParseAcceptsNonStreamingSubset(t *testing.T) {
 			name:          "minimal",
 			body:          `{"model":"local-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":32}`,
 			wantRoles:     []Role{RoleUser},
+			wantMode:      RequestModeNonStreaming,
 			wantTextBytes: 5,
 			wantTokens:    32,
 		},
@@ -121,6 +123,7 @@ func TestParseAcceptsNonStreamingSubset(t *testing.T) {
                 "n":1
               }`,
 			wantRoles:      []Role{RoleDeveloper, RoleSystem, RoleUser, RoleAssistant},
+			wantMode:       RequestModeNonStreaming,
 			wantTextBytes:  uint64(len("rules") + len("Bakı") + len("😀")),
 			wantTokens:     64,
 			oneByteAtATime: true,
@@ -129,6 +132,7 @@ func TestParseAcceptsNonStreamingSubset(t *testing.T) {
 			name:          "legal surrounding whitespace",
 			body:          " \n\t{\"model\":\"local-model\",\"messages\":[{\"content\":\"ok\",\"role\":\"user\"}],\"max_completion_tokens\":1}\r\n ",
 			wantRoles:     []Role{RoleUser},
+			wantMode:      RequestModeNonStreaming,
 			wantTextBytes: 2,
 			wantTokens:    1,
 		},
@@ -136,8 +140,17 @@ func TestParseAcceptsNonStreamingSubset(t *testing.T) {
 			name:          "escaped backslash is not a surrogate",
 			body:          `{"model":"local-model","messages":[{"role":"user","content":"\\uD800"}],"max_completion_tokens":1}`,
 			wantRoles:     []Role{RoleUser},
+			wantMode:      RequestModeNonStreaming,
 			wantTextBytes: uint64(len(`\uD800`)),
 			wantTokens:    1,
+		},
+		{
+			name:          "streaming response mode",
+			body:          `{"model":"local-model","messages":[{"role":"user","content":"stream"}],"max_completion_tokens":8,"stream":true}`,
+			wantRoles:     []Role{RoleUser},
+			wantMode:      RequestModeStreaming,
+			wantTextBytes: uint64(len("stream")),
+			wantTokens:    8,
 		},
 	}
 
@@ -159,6 +172,9 @@ func TestParseAcceptsNonStreamingSubset(t *testing.T) {
 			}
 			if request.MaxCompletionTokens() != test.wantTokens {
 				t.Fatalf("MaxCompletionTokens = %d, want %d", request.MaxCompletionTokens(), test.wantTokens)
+			}
+			if request.Mode() != test.wantMode {
+				t.Fatalf("Mode = %v, want %v", request.Mode(), test.wantMode)
 			}
 			if request.BodyBytes() != uint64(len(test.body)) {
 				t.Fatalf("BodyBytes = %d, want %d", request.BodyBytes(), len(test.body))
@@ -230,7 +246,7 @@ func TestParseRejectsAmbiguousOrUnsupportedJSON(t *testing.T) {
 		{name: "null content", body: []byte(`{"model":"local-model","messages":[{"role":"user","content":null}],"max_completion_tokens":1}`), reason: ReasonWrongType},
 		{name: "array content", body: []byte(`{"model":"local-model","messages":[{"role":"user","content":[]}],"max_completion_tokens":1}`), reason: ReasonWrongType},
 		{name: "invalid role", body: []byte(`{"model":"local-model","messages":[{"role":"tool","content":"x"}],"max_completion_tokens":1}`), reason: ReasonUnsupportedValue},
-		{name: "stream true", body: []byte(`{"model":"local-model","messages":[{"role":"user","content":"x"}],"max_completion_tokens":1,"stream":true}`), reason: ReasonUnsupportedValue},
+		{name: "duplicate stream", body: []byte(`{"model":"local-model","messages":[{"role":"user","content":"x"}],"max_completion_tokens":1,"stream":false,"stream":true}`), reason: ReasonDuplicateKey},
 		{name: "stream null", body: []byte(`{"model":"local-model","messages":[{"role":"user","content":"x"}],"max_completion_tokens":1,"stream":null}`), reason: ReasonWrongType},
 		{name: "stream options", body: []byte(`{"model":"local-model","messages":[{"role":"user","content":"x"}],"max_completion_tokens":1,"stream_options":{}}`), reason: ReasonUnsupportedValue},
 		{name: "n zero", body: []byte(`{"model":"local-model","messages":[{"role":"user","content":"x"}],"max_completion_tokens":1,"n":0}`), reason: ReasonUnsupportedValue},
@@ -672,6 +688,9 @@ func FuzzParseRequest(f *testing.F) {
 		}
 		if request.Model() != "local-model" || len(request.Messages()) == 0 || uint64(len(request.Messages())) > limits.MaxMessageCount {
 			t.Fatal("Parse() success violated normalized request invariants")
+		}
+		if request.Mode() != RequestModeNonStreaming && request.Mode() != RequestModeStreaming {
+			t.Fatal("Parse() success produced an invalid request mode")
 		}
 		if request.BodyBytes() != uint64(len(body)) || !bytes.Equal(request.BodyCopy(), body) {
 			t.Fatal("Parse() success did not preserve exact body bytes")
