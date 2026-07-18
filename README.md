@@ -6,11 +6,11 @@ turns tenant weights, bounded estimated work, queue deadlines, and client
 disconnects into explicit lifecycle decisions before an inference upstream is
 overloaded.
 
-> **Status:** the strict non-streaming request boundary, bounded admission
-> scheduler, authenticated HTTP lifecycle, fixed-destination upstream
-> transport, bounded inbound server, and Linux local-gateway command now run as
-> one tested path. Streaming, telemetry, persistence, and restart
-> reconciliation remain future milestones.
+> **Status:** the strict request and SSE boundaries, bounded admission
+> scheduler, backpressured streaming and buffered HTTP lifecycle,
+> fixed-destination upstream transport, bounded inbound server, and Linux
+> local-gateway command now run as one tested path. Telemetry, persistence, and
+> restart reconciliation remain future milestones.
 
 ## Implemented now
 
@@ -40,7 +40,7 @@ The scheduler adds:
 - golden traces, an independent seeded DRR oracle, adversarial fragmentation
   tests, deterministic fake-clock races, race detection, and 32-bit tests.
 
-The non-streaming HTTP lifecycle adds:
+The HTTP lifecycle adds:
 
 - exact path, method, bearer, media-type, queue-timeout, and body-validation
   precedence with static content-free error envelopes;
@@ -53,6 +53,15 @@ The non-streaming HTTP lifecycle adds:
   writer;
 - full bounded response buffering and strict `object: "chat.completion"`
   validation before a `200` is committed, with no upstream headers relayed;
+- a strict single-`data:` SSE decoder with total-byte, event-byte, event-count,
+  read-idle, event, and total deadlines;
+- one-event-at-a-time validation and flush, so a slow downstream applies
+  backpressure before another event is decoded; physical read-ahead is bounded
+  by the smaller of 4 KiB and the configured event/total envelopes;
+- exact `chat.completion.chunk` validation and a terminal `[DONE]` withheld
+  until clean EOF and successful upstream-body close;
+- a commit boundary that returns static JSON before the first chunk, then
+  truncates failures without injecting JSON or synthesizing `[DONE]`;
 - exact permit outcomes for completion, cancellation, upstream failure,
   downstream failure, and recovered internal failure;
 - adversarial tests for cancellation races, blocked-body closure, slot
@@ -113,10 +122,9 @@ The runnable Linux gateway adds:
 - adversarial configuration, secret, CLI, ownership, real-loopback, race, and
   32-bit tests, including a full client-to-upstream wire path.
 
-See [the local runbook](docs/running.md). Streaming is deliberately rejected by
-this implementation slice. Telemetry, the lifecycle journal, and restart
-reconciliation are still target work, so the v0.1 contract below remains
-broader than the code that exists today.
+See [the local runbook](docs/running.md). Telemetry, the lifecycle journal, and
+restart reconciliation are still target work, so the v0.1 contract below
+remains broader than the code that exists today.
 
 ## The research question
 
