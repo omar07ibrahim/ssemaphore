@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	policySchemaVersion       = 1
+	policySchemaVersion       = 2
 	maximumPolicyTenants      = 1024
 	maximumPolicyCredentials  = 4096
 	maximumPolicyTimeoutMS    = 3_600_000

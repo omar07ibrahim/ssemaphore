@@ -183,7 +183,8 @@ func TestParsePolicyRejectsSchemaListenerAndContractViolations(t *testing.T) {
 		name   string
 		mutate func(*policyDocument)
 	}{
-		{name: "unsupported schema version", mutate: func(d *policyDocument) { d.SchemaVersion = 2 }},
+		{name: "legacy schema version", mutate: func(d *policyDocument) { d.SchemaVersion = 1 }},
+		{name: "future schema version", mutate: func(d *policyDocument) { d.SchemaVersion = policySchemaVersion + 1 }},
 		{name: "unsupported listener type", mutate: func(d *policyDocument) { d.Listener.Type = "unix" }},
 		{name: "wildcard listener", mutate: func(d *policyDocument) { d.Listener.Host = "0.0.0.0" }},
 		{name: "DNS listener", mutate: func(d *policyDocument) { d.Listener.Host = "localhost" }},
@@ -426,9 +427,9 @@ func TestParsePolicyReducesDocumentFailuresToStaticError(t *testing.T) {
 		data []byte
 	}{
 		{name: "top-level null", data: []byte(`null`)},
-		{name: "null listener", data: []byte(`{"schema_version":1,"listener":null}`)},
+		{name: "null listener", data: []byte(`{"schema_version":2,"listener":null}`)},
 		{name: "missing server", data: missingServer},
-		{name: "unknown canary", data: []byte(`{"schema_version":1,"UNKNOWN_POLICY_CANARY":"SECRET_POLICY_CANARY"}`)},
+		{name: "unknown canary", data: []byte(`{"schema_version":2,"UNKNOWN_POLICY_CANARY":"SECRET_POLICY_CANARY"}`)},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -530,7 +531,7 @@ func marshalPolicyDocument(t *testing.T, document policyDocument) []byte {
 
 func canonicalPolicyDocument() policyDocument {
 	return policyDocument{
-		SchemaVersion: 1,
+		SchemaVersion: policySchemaVersion,
 		Listener: listenerPolicy{
 			Type: "tcp",
 			Host: "127.0.0.1",

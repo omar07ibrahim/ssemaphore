@@ -48,6 +48,9 @@ func (h *Handler) relaySSE(
 				eventTimedOut || idleReader.TimedOut(),
 			)
 		}
+		if idleReader.TimedOut() {
+			return h.finishSSEFailure(sink, request, permit, upstreamContext, true)
+		}
 		if contextOutcome, handled := h.handleUpstreamContext(
 			sink,
 			request,
@@ -68,6 +71,9 @@ func (h *Handler) relaySSE(
 					verifyTimedOut || idleReader.TimedOut(),
 				)
 			}
+			if idleReader.TimedOut() {
+				return h.finishSSEFailure(sink, request, permit, upstreamContext, true)
+			}
 			if closeErr := body.Close(); closeErr != nil {
 				return h.finishSSEFailure(sink, request, permit, upstreamContext, false)
 			}
@@ -80,28 +86,12 @@ func (h *Handler) relaySSE(
 				return contextOutcome
 			}
 			if writeErr := sink.writeSSEEvent(int64(event.BodyBytes()), event.BodyReader()); writeErr != nil {
-				if contextOutcome, handled := h.handleUpstreamContext(
-					sink,
-					request,
-					permit,
-					upstreamContext,
-				); handled {
-					return contextOutcome
-				}
 				return admission.ServingDownstreamFailed
 			}
 			return admission.ServingCompleted
 		}
 
 		if writeErr := sink.writeSSEEvent(int64(event.BodyBytes()), event.BodyReader()); writeErr != nil {
-			if contextOutcome, handled := h.handleUpstreamContext(
-				sink,
-				request,
-				permit,
-				upstreamContext,
-			); handled {
-				return contextOutcome
-			}
 			return admission.ServingDownstreamFailed
 		}
 	}
@@ -208,7 +198,10 @@ func (r *sseIdleReader) Read(destination []byte) (int, error) {
 		<-callbackDone
 	}
 	if r.timedOut.Load() {
-		return n, errSSEReadTimeout
+		// A reader may return bytes while Close races with Read. Once the idle
+		// timer wins, none of those bytes may enter bufio: ReadSlice could find
+		// a delimiter and defer the accompanying error until after a flush.
+		return 0, errSSEReadTimeout
 	}
 	return n, err
 }

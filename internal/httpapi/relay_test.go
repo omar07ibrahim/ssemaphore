@@ -112,6 +112,48 @@ type relayTestBody struct {
 	closeCalls  atomic.Int32
 }
 
+// relayTestTimeoutReleaseBody models the legal but adversarial Reader case in
+// which a concurrent Close unblocks Read and that Read still returns bytes.
+// Those bytes must be discarded once the idle timer has won.
+type relayTestTimeoutReleaseBody struct {
+	immediate []byte
+	offset    int
+	onClose   []byte
+
+	closed     chan struct{}
+	closeOnce  sync.Once
+	closeCalls atomic.Int32
+}
+
+func newRelayTestTimeoutReleaseBody(immediate, onClose string) *relayTestTimeoutReleaseBody {
+	return &relayTestTimeoutReleaseBody{
+		immediate: []byte(immediate),
+		onClose:   []byte(onClose),
+		closed:    make(chan struct{}),
+	}
+}
+
+func (b *relayTestTimeoutReleaseBody) Read(destination []byte) (int, error) {
+	if b.offset < len(b.immediate) {
+		n := copy(destination, b.immediate[b.offset:])
+		b.offset += n
+		return n, nil
+	}
+	<-b.closed
+	if len(b.onClose) == 0 {
+		return 0, relayTestBodyClosedError
+	}
+	n := copy(destination, b.onClose)
+	b.onClose = b.onClose[n:]
+	return n, nil
+}
+
+func (b *relayTestTimeoutReleaseBody) Close() error {
+	b.closeCalls.Add(1)
+	b.closeOnce.Do(func() { close(b.closed) })
+	return nil
+}
+
 func newRelayTestBody(immediate string) *relayTestBody {
 	return &relayTestBody{
 		immediate:  []byte(immediate),
@@ -203,6 +245,7 @@ type relayTestWriter struct {
 	failFlushAt int
 	writeErr    error
 	flushErr    error
+	beforeWrite func()
 	flushed     chan struct{}
 }
 
@@ -230,6 +273,11 @@ func (w *relayTestWriter) Write(body []byte) (int, error) {
 		w.status = http.StatusOK
 	}
 	w.writes++
+	if w.beforeWrite != nil {
+		beforeWrite := w.beforeWrite
+		w.beforeWrite = nil
+		beforeWrite()
+	}
 	if w.failWriteAt != 0 && w.writes == w.failWriteAt {
 		return 0, w.writeErr
 	}
@@ -651,6 +699,71 @@ func TestHandlerStreamingTimeoutsBeforeAndAfterCommit(t *testing.T) {
 	}
 }
 
+func TestHandlerDiscardsBytesReturnedAfterIdleTimeout(t *testing.T) {
+	tests := []struct {
+		name        string
+		immediate   string
+		onClose     string
+		wantStatus  int
+		wantBody    string
+		wantFlushes int
+	}{
+		{
+			name:       "first chunk released by close",
+			onClose:    relayTestChunkOne + relayTestDone,
+			wantStatus: http.StatusGatewayTimeout,
+			wantBody:   relayTestErrorBody(errUpstreamTimeout),
+		},
+		{
+			name:        "later chunks released by close",
+			immediate:   relayTestChunkOne,
+			onClose:     relayTestChunkTwo + relayTestDone,
+			wantStatus:  http.StatusOK,
+			wantBody:    relayTestChunkOne,
+			wantFlushes: 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body := newRelayTestTimeoutReleaseBody(test.immediate, test.onClose)
+			fixture := newRelayTestFixture(t, newRelayTestBody(""), context.Background())
+			fixture.upstream.body = body
+			fixture.handler.streamReadTimeout = 25 * time.Millisecond
+			fixture.handler.streamEventTimeout = 500 * time.Millisecond
+			fixture.handler.upstreamTimeout = 2 * time.Second
+			writer := newRelayTestWriter()
+
+			fixture.handler.ServeHTTP(writer, relayTestRequestFor(context.Background()))
+
+			status, responseBody, flushes, _ := writer.snapshot()
+			if status != test.wantStatus || responseBody != test.wantBody || flushes != test.wantFlushes {
+				t.Fatalf(
+					"idle-timeout response = (%d, %q, %d flushes), want (%d, %q, %d)",
+					status,
+					responseBody,
+					flushes,
+					test.wantStatus,
+					test.wantBody,
+					test.wantFlushes,
+				)
+			}
+			if strings.Contains(responseBody, relayTestChunkTwo) || strings.Contains(responseBody, "[DONE]") {
+				t.Fatal("idle timeout relayed bytes returned by the concurrent Close")
+			}
+			if fixture.gate.calls.Load() != 1 || fixture.upstream.calls.Load() != 1 || body.closeCalls.Load() != 1 {
+				t.Fatalf(
+					"idle-timeout lifecycle calls = acquire:%d upstream:%d close:%d, want 1/1/1",
+					fixture.gate.calls.Load(),
+					fixture.upstream.calls.Load(),
+					body.closeCalls.Load(),
+				)
+			}
+			relayTestRequireOutcome(t, fixture.permit, admission.ServingUpstreamFailed)
+		})
+	}
+}
+
 func TestHandlerStreamingCancellationPriority(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -770,5 +883,29 @@ func TestHandlerStreamingDownstreamFailuresFinishOnce(t *testing.T) {
 			relayTestRequireDispatchedOnce(t, fixture)
 			relayTestRequireOutcome(t, fixture.permit, admission.ServingDownstreamFailed)
 		})
+	}
+}
+
+func TestHandlerKeepsWriteFailureAttributionWhenCancellationRaces(t *testing.T) {
+	requestContext, cancelRequest := context.WithCancel(context.Background())
+	body := newRelayTestBody(relayTestChunkOne + relayTestDone)
+	fixture := newRelayTestFixture(t, body, requestContext)
+	writer := newRelayTestWriter()
+	writer.failWriteAt = 1
+	writer.writeErr = errors.New("downstream write failed after cancellation")
+	writer.beforeWrite = cancelRequest
+
+	fixture.handler.ServeHTTP(writer, relayTestRequestFor(requestContext))
+
+	status, responseBody, flushes, _ := writer.snapshot()
+	if status != http.StatusOK || responseBody != "" || flushes != 0 {
+		t.Fatalf("raced write response = (%d, %q, %d flushes), want committed empty stream", status, responseBody, flushes)
+	}
+	// The Handler reports the immediate I/O cause. A real scheduler may still
+	// apply its serialized shutdown/client-cancellation terminal priority when
+	// Finish submits this outcome.
+	relayTestRequireOutcome(t, fixture.permit, admission.ServingDownstreamFailed)
+	if fixture.gate.calls.Load() != 1 || fixture.upstream.calls.Load() != 1 || body.closeCalls.Load() != 1 {
+		t.Fatal("raced downstream failure did not preserve exact-once cleanup")
 	}
 }
