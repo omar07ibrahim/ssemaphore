@@ -21,17 +21,21 @@ import (
 
 type requestIDSource func() (string, error)
 
-// Handler implements the authenticated, bounded non-streaming HTTP lifecycle.
+// Handler implements the authenticated, bounded Chat Completions HTTP
+// lifecycle for both buffered and event-stream responses.
 // It is immutable after construction and safe for concurrent use.
 type Handler struct {
 	parser              *contract.Parser
 	scheduler           *admission.Scheduler
 	gate                admissionGate
-	upstream            NonStreamingUpstream
+	upstream            Upstream
 	responseValidator   *contract.ResponseValidator
+	sseLimits           contract.SSELimits
 	defaultQueueTimeout time.Duration
 	bodyReadTimeout     time.Duration
 	upstreamTimeout     time.Duration
+	streamReadTimeout   time.Duration
+	streamEventTimeout  time.Duration
 	globalSlots         chan struct{}
 	tenantSlots         map[admission.TenantID]chan struct{}
 	credentials         []storedCredential
@@ -43,7 +47,7 @@ func NewHandler(
 	config Config,
 	parser *contract.Parser,
 	scheduler *admission.Scheduler,
-	upstream NonStreamingUpstream,
+	upstream Upstream,
 ) (*Handler, error) {
 	return newHandler(config, parser, scheduler, schedulerGate{scheduler: scheduler}, upstream, secureRequestID)
 }
@@ -80,7 +84,7 @@ func newHandler(
 	parser *contract.Parser,
 	scheduler *admission.Scheduler,
 	gate admissionGate,
-	upstream NonStreamingUpstream,
+	upstream Upstream,
 	requestIDs requestIDSource,
 ) (*Handler, error) {
 	validated, err := validateHandlerConfig(config, parser, scheduler)
@@ -91,7 +95,7 @@ func newHandler(
 		return nil, errors.New("admission gate must not be nil")
 	}
 	if upstream == nil {
-		return nil, errors.New("non-streaming upstream must not be nil")
+		return nil, errors.New("upstream must not be nil")
 	}
 	if requestIDs == nil {
 		return nil, errors.New("request ID source must not be nil")
@@ -103,9 +107,12 @@ func newHandler(
 		gate:                gate,
 		upstream:            upstream,
 		responseValidator:   validated.responseValidator,
+		sseLimits:           validated.sseLimits,
 		defaultQueueTimeout: validated.defaultQueueTimeout,
 		bodyReadTimeout:     validated.bodyReadTimeout,
 		upstreamTimeout:     validated.upstreamTimeout,
+		streamReadTimeout:   validated.streamReadTimeout,
+		streamEventTimeout:  validated.streamEventTimeout,
 		globalSlots:         validated.globalSlots,
 		tenantSlots:         validated.tenantSlots,
 		credentials:         validated.credentials,
@@ -202,6 +209,10 @@ func (h *Handler) serve(sink *responseSink, request *http.Request) {
 		_ = sink.writeError(errInvalidRequest)
 		return
 	}
+	if parsed.Mode() == contract.RequestModeStreaming && !supportsResponseFlush(sink.writer) {
+		_ = sink.writeError(errInternal)
+		return
+	}
 
 	permit, decision := h.gate.Acquire(request.Context(), admission.Admission{
 		Tenant:       tenant,
@@ -248,7 +259,7 @@ func (h *Handler) serve(sink *responseSink, request *http.Request) {
 		response.Body = newOnceReadCloser(response.Body)
 		defer response.Body.Close()
 		stopClose := context.AfterFunc(upstreamContext, func() {
-			_ = response.Body.Close()
+			closeIgnoringPanic(response.Body)
 		})
 		defer stopClose()
 	}
@@ -264,11 +275,15 @@ func (h *Handler) serve(sink *responseSink, request *http.Request) {
 		}
 		return
 	}
-	if upstreamErr != nil || !validUpstreamMetadata(response) {
+	if upstreamErr != nil || !validUpstreamMetadata(response, parsed.Mode()) {
 		outcome = admission.ServingUpstreamFailed
 		if sink.writeError(errBadUpstream) != nil {
 			outcome = admission.ServingDownstreamFailed
 		}
+		return
+	}
+	if parsed.Mode() == contract.RequestModeStreaming {
+		outcome = h.relaySSE(sink, request, permit, upstreamContext, response.Body)
 		return
 	}
 
@@ -320,7 +335,7 @@ func (h *Handler) parseRequest(writer http.ResponseWriter, request *http.Request
 	readContext, cancelRead := context.WithTimeout(request.Context(), h.bodyReadTimeout)
 	defer cancelRead()
 	stopClose := context.AfterFunc(readContext, func() {
-		_ = body.Close()
+		closeIgnoringPanic(body)
 	})
 	defer stopClose()
 
@@ -445,7 +460,9 @@ func (h *Handler) handleUpstreamContext(
 		if request.Context().Err() != nil {
 			return admission.ServingCanceled, true
 		}
-		_ = sink.writeError(errDraining)
+		if !sink.committed {
+			_ = sink.writeError(errDraining)
+		}
 		return admission.ServingCanceled, true
 	}
 	if errors.Is(upstreamContext.Err(), context.DeadlineExceeded) {
@@ -456,8 +473,13 @@ func (h *Handler) handleUpstreamContext(
 			if request.Context().Err() != nil {
 				return admission.ServingCanceled, true
 			}
-			_ = sink.writeError(errDraining)
+			if !sink.committed {
+				_ = sink.writeError(errDraining)
+			}
 			return admission.ServingCanceled, true
+		}
+		if sink.committed {
+			return admission.ServingUpstreamFailed, true
 		}
 		if sink.writeError(errUpstreamTimeout) != nil {
 			return admission.ServingDownstreamFailed, true
@@ -487,10 +509,11 @@ func validJSONMediaType(header http.Header) bool {
 	return true
 }
 
-func validUpstreamMetadata(response UpstreamResponse) bool {
-	return response.StatusCode == http.StatusOK &&
-		response.Body != nil &&
-		validJSONMediaType(response.Header)
+func validUpstreamMetadata(response UpstreamResponse, mode contract.RequestMode) bool {
+	if mode == contract.RequestModeStreaming {
+		return validStreamingUpstreamMetadata(response)
+	}
+	return response.StatusCode == http.StatusOK && response.Body != nil && validJSONMediaType(response.Header)
 }
 
 func exactChatCompletionsPath(request *http.Request) bool {
