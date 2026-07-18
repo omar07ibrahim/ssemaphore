@@ -1,5 +1,5 @@
 // Package httpapi connects the bounded request contract and admission
-// scheduler to a deliberately small non-streaming HTTP surface.
+// scheduler to a deliberately small HTTP surface.
 package httpapi
 
 import (
@@ -34,13 +34,19 @@ type TenantPreDispatchLimit struct {
 	Count  uint64
 }
 
-// Config defines finite policy deadlines, response buffering, credentials,
-// and the request slots that protect work before scheduler admission.
+// Config defines finite policy deadlines, response and stream bounds,
+// credentials, and the request slots that protect work before scheduler
+// admission. MaxResponseBodyBytes bounds both a buffered JSON response and the
+// total wire bytes of an SSE response.
 type Config struct {
 	DefaultQueueTimeout  time.Duration
 	BodyReadTimeout      time.Duration
 	UpstreamTimeout      time.Duration
+	StreamReadTimeout    time.Duration
+	StreamEventTimeout   time.Duration
 	MaxResponseBodyBytes uint64
+	MaxStreamEventBytes  uint64
+	MaxStreamEvents      uint64
 
 	GlobalPreDispatchLimit uint64
 	TenantPreDispatch      []TenantPreDispatchLimit
@@ -55,15 +61,19 @@ type TimeoutPolicy struct {
 	UpstreamTimeout     time.Duration
 }
 
-// NonStreamingUpstream receives only a validated request and the permit-owned
-// context. It cannot observe inbound credentials, headers, URLs, or the
-// downstream ResponseWriter. Complete may be called concurrently and must
-// return when ctx is canceled.
-type NonStreamingUpstream interface {
+// Upstream receives only a validated request and the permit-owned context. It
+// cannot observe inbound credentials, headers, URLs, or the downstream
+// ResponseWriter. Complete may be called concurrently and must return when ctx
+// is canceled.
+type Upstream interface {
 	Complete(context.Context, contract.Request) (UpstreamResponse, error)
 }
 
-// IdleConnectionCloser is an optional NonStreamingUpstream capability. Its
+// NonStreamingUpstream is retained as a temporary source-compatible alias for
+// integrations written before the bounded streaming relay was introduced.
+type NonStreamingUpstream = Upstream
+
+// IdleConnectionCloser is an optional Upstream capability. Its
 // method may run concurrently with Complete, must not interrupt active work,
 // and must return promptly. Handler recovers an implementation panic so a
 // terminal server cleanup cannot crash the process.

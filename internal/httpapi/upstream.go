@@ -55,8 +55,8 @@ func (HTTPUpstreamConfig) String() string   { return "httpapi.HTTPUpstreamConfig
 func (HTTPUpstreamConfig) GoString() string { return "httpapi.HTTPUpstreamConfig{redacted}" }
 
 // HTTPUpstream is a concurrent-safe, fixed-destination implementation of
-// NonStreamingUpstream. The caller-owned context is the only total request
-// timer; transport timeouts bound individual network phases.
+// Upstream. The caller-owned context is the only total request timer;
+// transport timeouts bound individual network phases.
 type HTTPUpstream struct {
 	endpoint      string
 	authorization string
@@ -65,7 +65,7 @@ type HTTPUpstream struct {
 	transport     *http.Transport
 }
 
-var _ NonStreamingUpstream = (*HTTPUpstream)(nil)
+var _ Upstream = (*HTTPUpstream)(nil)
 
 // upstreamTransportContext preserves lifecycle signals while preventing
 // caller-installed context values such as httptrace hooks from observing the
@@ -178,7 +178,11 @@ func (u *HTTPUpstream) Complete(ctx context.Context, request contract.Request) (
 	outbound.ContentLength = int64(request.BodyBytes())
 	outbound.GetBody = nil
 	outbound.Header = make(http.Header, 4)
-	outbound.Header.Set("Accept", "application/json")
+	accept := "application/json"
+	if request.Mode() == contract.RequestModeStreaming {
+		accept = "text/event-stream"
+	}
+	outbound.Header.Set("Accept", accept)
 	outbound.Header.Set("Authorization", u.authorization)
 	outbound.Header.Set("Content-Type", "application/json")
 	outbound.Header.Set("User-Agent", upstreamUserAgent)

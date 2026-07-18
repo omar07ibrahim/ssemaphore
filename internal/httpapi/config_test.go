@@ -96,8 +96,32 @@ func TestValidateHandlerConfigRejectsTimeoutAndResponseBounds(t *testing.T) {
 		{name: "zero upstream timeout", mutate: func(c *Config) { c.UpstreamTimeout = 0 }, match: "upstream timeout"},
 		{name: "negative upstream timeout", mutate: func(c *Config) { c.UpstreamTimeout = -time.Nanosecond }, match: "upstream timeout"},
 		{name: "upstream timeout above maximum", mutate: func(c *Config) { c.UpstreamTimeout = absoluteMaxPolicyTimeout + time.Nanosecond }, match: "upstream timeout"},
+		{name: "zero stream read timeout", mutate: func(c *Config) { c.StreamReadTimeout = 0 }, match: "stream read timeout"},
+		{name: "negative stream read timeout", mutate: func(c *Config) { c.StreamReadTimeout = -time.Nanosecond }, match: "stream read timeout"},
+		{name: "stream read timeout above maximum", mutate: func(c *Config) { c.StreamReadTimeout = absoluteMaxPolicyTimeout + time.Nanosecond }, match: "stream read timeout"},
+		{name: "zero stream event timeout", mutate: func(c *Config) { c.StreamEventTimeout = 0 }, match: "stream event timeout"},
+		{name: "negative stream event timeout", mutate: func(c *Config) { c.StreamEventTimeout = -time.Nanosecond }, match: "stream event timeout"},
+		{name: "stream event timeout above maximum", mutate: func(c *Config) { c.StreamEventTimeout = absoluteMaxPolicyTimeout + time.Nanosecond }, match: "stream event timeout"},
+		{name: "stream read exceeds event timeout", mutate: func(c *Config) { c.StreamReadTimeout = c.StreamEventTimeout + time.Nanosecond }, match: "stream read timeout exceeds stream event timeout"},
+		{name: "stream event exceeds upstream timeout", mutate: func(c *Config) { c.StreamEventTimeout = c.UpstreamTimeout + time.Nanosecond }, match: "stream event timeout exceeds upstream timeout"},
 		{name: "zero response bytes", mutate: func(c *Config) { c.MaxResponseBodyBytes = 0 }, match: "response limits"},
 		{name: "response bytes above maximum", mutate: func(c *Config) { c.MaxResponseBodyBytes = contract.AbsoluteMaxResponseBodyBytes + 1 }, match: "response limits"},
+		{
+			name: "total bytes below minimum stream",
+			mutate: func(c *Config) {
+				c.MaxResponseBodyBytes = 55
+				c.MaxStreamEventBytes = 42
+				c.MaxStreamEvents = 2
+			},
+			match: "total bytes cannot fit the smallest valid stream",
+		},
+		{name: "zero stream event bytes", mutate: func(c *Config) { c.MaxStreamEventBytes = 0 }, match: "event bytes must be positive"},
+		{name: "stream event bytes above hard maximum", mutate: func(c *Config) { c.MaxStreamEventBytes = contract.AbsoluteMaxSSEEventBytes + 1 }, match: "event bytes exceeds its hard safety limit"},
+		{name: "stream event bytes exceed total", mutate: func(c *Config) { c.MaxStreamEventBytes = c.MaxResponseBodyBytes + 1 }, match: "event bytes exceeds the total byte limit"},
+		{name: "stream event bytes below minimum", mutate: func(c *Config) { c.MaxStreamEventBytes = 1 }, match: "event bytes cannot fit the smallest valid event"},
+		{name: "zero stream events", mutate: func(c *Config) { c.MaxStreamEvents = 0 }, match: "events must fit a chunk and terminal event"},
+		{name: "one stream event", mutate: func(c *Config) { c.MaxStreamEvents = 1 }, match: "events must fit a chunk and terminal event"},
+		{name: "stream events above hard maximum", mutate: func(c *Config) { c.MaxStreamEvents = contract.AbsoluteMaxSSEEvents + 1 }, match: "events exceeds its hard safety limit"},
 	}
 
 	for _, test := range tests {
@@ -118,7 +142,11 @@ func TestValidateHandlerConfigAcceptsExactPolicyAndResponseMaximums(t *testing.T
 	config.DefaultQueueTimeout = admission.MaximumQueueTimeout
 	config.BodyReadTimeout = absoluteMaxPolicyTimeout
 	config.UpstreamTimeout = absoluteMaxPolicyTimeout
+	config.StreamReadTimeout = absoluteMaxPolicyTimeout
+	config.StreamEventTimeout = absoluteMaxPolicyTimeout
 	config.MaxResponseBodyBytes = contract.AbsoluteMaxResponseBodyBytes
+	config.MaxStreamEventBytes = contract.AbsoluteMaxSSEEventBytes
+	config.MaxStreamEvents = contract.AbsoluteMaxSSEEvents
 
 	validated, err := validateHandlerConfig(config, parser, scheduler)
 	if err != nil {
@@ -126,8 +154,126 @@ func TestValidateHandlerConfigAcceptsExactPolicyAndResponseMaximums(t *testing.T
 	}
 	if validated.defaultQueueTimeout != admission.MaximumQueueTimeout ||
 		validated.bodyReadTimeout != absoluteMaxPolicyTimeout ||
-		validated.upstreamTimeout != absoluteMaxPolicyTimeout {
-		t.Fatalf("validated timeouts = (%s, %s, %s), want exact maxima", validated.defaultQueueTimeout, validated.bodyReadTimeout, validated.upstreamTimeout)
+		validated.upstreamTimeout != absoluteMaxPolicyTimeout ||
+		validated.streamReadTimeout != absoluteMaxPolicyTimeout ||
+		validated.streamEventTimeout != absoluteMaxPolicyTimeout {
+		t.Fatalf(
+			"validated timeouts = (%s, %s, %s, %s, %s), want exact maxima",
+			validated.defaultQueueTimeout,
+			validated.bodyReadTimeout,
+			validated.upstreamTimeout,
+			validated.streamReadTimeout,
+			validated.streamEventTimeout,
+		)
+	}
+	wantSSELimits := contract.SSELimits{
+		MaxTotalBytes: contract.AbsoluteMaxResponseBodyBytes,
+		MaxEventBytes: contract.AbsoluteMaxSSEEventBytes,
+		MaxEvents:     contract.AbsoluteMaxSSEEvents,
+	}
+	if validated.sseLimits != wantSSELimits {
+		t.Fatalf("validated SSE limits = %+v, want %+v", validated.sseLimits, wantSSELimits)
+	}
+}
+
+func TestValidateHandlerConfigAcceptsEqualMinimumStreamTimeouts(t *testing.T) {
+	parser := configTestNewParser(t, configTestMaxBodyBytes, configTestMaxRequestUnits)
+	scheduler := configTestNewScheduler(t, nil)
+	config := configTestBaseHandlerConfig()
+	config.UpstreamTimeout = time.Nanosecond
+	config.StreamReadTimeout = time.Nanosecond
+	config.StreamEventTimeout = time.Nanosecond
+
+	validated, err := validateHandlerConfig(config, parser, scheduler)
+	if err != nil {
+		t.Fatalf("validateHandlerConfig() error = %v", err)
+	}
+	if validated.upstreamTimeout != time.Nanosecond ||
+		validated.streamReadTimeout != time.Nanosecond ||
+		validated.streamEventTimeout != time.Nanosecond {
+		t.Fatalf(
+			"validated stream timeout envelope = (%s, %s, %s), want equal 1ns minimums",
+			validated.streamReadTimeout,
+			validated.streamEventTimeout,
+			validated.upstreamTimeout,
+		)
+	}
+}
+
+func TestValidateHandlerConfigStoresIndependentSSEPolicy(t *testing.T) {
+	parser := configTestNewParser(t, configTestMaxBodyBytes, configTestMaxRequestUnits)
+	scheduler := configTestNewScheduler(t, nil)
+	config := configTestBaseHandlerConfig()
+	config.StreamReadTimeout = 17 * time.Millisecond
+	config.StreamEventTimeout = 29 * time.Millisecond
+	config.UpstreamTimeout = 41 * time.Millisecond
+	config.MaxResponseBodyBytes = 509
+	config.MaxStreamEventBytes = 211
+	config.MaxStreamEvents = 13
+
+	validated, err := validateHandlerConfig(config, parser, scheduler)
+	if err != nil {
+		t.Fatalf("validateHandlerConfig() error = %v", err)
+	}
+	if validated.streamReadTimeout != config.StreamReadTimeout ||
+		validated.streamEventTimeout != config.StreamEventTimeout {
+		t.Fatalf(
+			"validated stream timeouts = (%s, %s), want (%s, %s)",
+			validated.streamReadTimeout,
+			validated.streamEventTimeout,
+			config.StreamReadTimeout,
+			config.StreamEventTimeout,
+		)
+	}
+	wantLimits := contract.SSELimits{
+		MaxTotalBytes: config.MaxResponseBodyBytes,
+		MaxEventBytes: config.MaxStreamEventBytes,
+		MaxEvents:     config.MaxStreamEvents,
+	}
+	if validated.sseLimits != wantLimits {
+		t.Fatalf("validated SSE limits = %+v, want %+v", validated.sseLimits, wantLimits)
+	}
+}
+
+func TestValidateHandlerConfigAcceptsMinimumSSEEnvelope(t *testing.T) {
+	parser := configTestNewParser(t, configTestMaxBodyBytes, configTestMaxRequestUnits)
+	scheduler := configTestNewScheduler(t, nil)
+	config := configTestBaseHandlerConfig()
+	config.MaxResponseBodyBytes = 56
+	config.MaxStreamEventBytes = 42
+	config.MaxStreamEvents = 2
+
+	validated, err := validateHandlerConfig(config, parser, scheduler)
+	if err != nil {
+		t.Fatalf("validateHandlerConfig() error = %v", err)
+	}
+	want := contract.SSELimits{MaxTotalBytes: 56, MaxEventBytes: 42, MaxEvents: 2}
+	if validated.sseLimits != want {
+		t.Fatalf("validated SSE limits = %+v, want exact minimum %+v", validated.sseLimits, want)
+	}
+}
+
+func TestValidatedSSEPolicyFitsSigned32Bit(t *testing.T) {
+	parser := configTestNewParser(t, configTestMaxBodyBytes, configTestMaxRequestUnits)
+	scheduler := configTestNewScheduler(t, nil)
+	config := configTestBaseHandlerConfig()
+	config.MaxResponseBodyBytes = contract.AbsoluteMaxResponseBodyBytes
+	config.MaxStreamEventBytes = contract.AbsoluteMaxSSEEventBytes
+	config.MaxStreamEvents = contract.AbsoluteMaxSSEEvents
+
+	validated, err := validateHandlerConfig(config, parser, scheduler)
+	if err != nil {
+		t.Fatalf("validateHandlerConfig() error = %v", err)
+	}
+	values := map[string]uint64{
+		"total bytes": validated.sseLimits.MaxTotalBytes,
+		"event bytes": validated.sseLimits.MaxEventBytes,
+		"events":      validated.sseLimits.MaxEvents,
+	}
+	for name, value := range values {
+		if value > uint64(math.MaxInt32) {
+			t.Errorf("validated SSE %s = %d, exceeds signed 32-bit range", name, value)
+		}
 	}
 }
 
@@ -348,7 +494,11 @@ func configTestBaseHandlerConfig() Config {
 		DefaultQueueTimeout:    5 * time.Second,
 		BodyReadTimeout:        5 * time.Second,
 		UpstreamTimeout:        5 * time.Second,
+		StreamReadTimeout:      time.Second,
+		StreamEventTimeout:     2 * time.Second,
 		MaxResponseBodyBytes:   512,
+		MaxStreamEventBytes:    256,
+		MaxStreamEvents:        8,
 		GlobalPreDispatchLimit: 2,
 		TenantPreDispatch: []TenantPreDispatchLimit{
 			{Tenant: configTestTenantOne, Count: 1},

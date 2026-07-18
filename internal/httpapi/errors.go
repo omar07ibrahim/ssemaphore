@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"reflect"
 	"strconv"
 )
 
@@ -33,6 +34,7 @@ var (
 type responseSink struct {
 	writer    http.ResponseWriter
 	committed bool
+	streaming bool
 }
 
 func (s *responseSink) writeJSON(status int, body []byte) error {
@@ -60,4 +62,72 @@ func (s *responseSink) writeJSONReader(status int, length int64, body io.Reader)
 func (s *responseSink) writeError(failure publicError) error {
 	body := []byte(`{"error":{"code":"` + failure.code + `","message":"` + failure.message + `"}}` + "\n")
 	return s.writeJSON(failure.status, body)
+}
+
+// writeSSEEvent commits the canonical streaming response on its first call,
+// writes one already-validated event in full, and flushes that event before it
+// returns. It never copies an upstream response header or sets Content-Length.
+func (s *responseSink) writeSSEEvent(length int64, body io.Reader) error {
+	if length <= 0 {
+		return errors.New("SSE event length must be positive")
+	}
+	if body == nil {
+		return errors.New("SSE event body must not be nil")
+	}
+	if s.committed && !s.streaming {
+		return errors.New("response already committed")
+	}
+	if !supportsResponseFlush(s.writer) {
+		return http.ErrNotSupported
+	}
+	if !s.committed {
+		header := s.writer.Header()
+		requestID := header.Get(requestIDHeader)
+		clear(header)
+		header.Set("Content-Type", "text/event-stream")
+		header.Set("Cache-Control", "no-store")
+		header.Set("X-Content-Type-Options", "nosniff")
+		if requestID != "" {
+			header.Set(requestIDHeader, requestID)
+		}
+		s.streaming = true
+		s.committed = true
+		s.writer.WriteHeader(http.StatusOK)
+	}
+
+	written, err := io.CopyN(s.writer, body, length)
+	if err == nil && written != length {
+		return io.ErrShortWrite
+	}
+	if err != nil {
+		return err
+	}
+	return http.NewResponseController(s.writer).Flush()
+}
+
+func supportsResponseFlush(writer http.ResponseWriter) bool {
+	seen := make(map[http.ResponseWriter]struct{}, 4)
+	for range 64 {
+		if writer == nil {
+			return false
+		}
+		if concrete := reflect.TypeOf(writer); concrete.Comparable() {
+			if _, duplicate := seen[writer]; duplicate {
+				return false
+			}
+			seen[writer] = struct{}{}
+		}
+		if _, ok := writer.(interface{ FlushError() error }); ok {
+			return true
+		}
+		if _, ok := writer.(http.Flusher); ok {
+			return true
+		}
+		unwrapper, ok := writer.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return false
+		}
+		writer = unwrapper.Unwrap()
+	}
+	return false
 }
