@@ -41,3 +41,6 @@ jobs:
 
       - name: Test 32-bit arithmetic
         run: GOARCH=386 go test ./... -shuffle=on -count=1
+
+      - name: Check generated README evidence
+        run: GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals --check
