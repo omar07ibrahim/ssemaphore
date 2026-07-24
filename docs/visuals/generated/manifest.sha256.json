@@ -1,0 +1,82 @@
+{
+  "schema": "ssemaphore.readme-visuals.v1",
+  "demo": {
+    "command": "go run ./tools/render_readme_visuals",
+    "scope": "one Linux gateway instance, one tenant, two synthetic numeric-loopback requests",
+    "toolchain": "go1.26.5",
+    "platform": "linux"
+  },
+  "provenance": {
+    "engine": {
+      "files": [
+        ".go-version",
+        "cmd/ssemaphore/main.go",
+        "configs/policy.example.json",
+        "go.mod",
+        "internal/admission/clock.go",
+        "internal/admission/config.go",
+        "internal/admission/expiry.go",
+        "internal/admission/owner.go",
+        "internal/admission/scheduler.go",
+        "internal/admission/types.go",
+        "internal/app/build.go",
+        "internal/app/command.go",
+        "internal/app/json.go",
+        "internal/app/listener.go",
+        "internal/app/policy.go",
+        "internal/app/policy_file.go",
+        "internal/app/secrets.go",
+        "internal/app/signals.go",
+        "internal/app/supervise.go",
+        "internal/contract/decode.go",
+        "internal/contract/jsonscan.go",
+        "internal/contract/request.go",
+        "internal/contract/response.go",
+        "internal/contract/sse.go",
+        "internal/httpapi/config.go",
+        "internal/httpapi/errors.go",
+        "internal/httpapi/handler.go",
+        "internal/httpapi/relay.go",
+        "internal/httpapi/stream.go",
+        "internal/httpapi/types.go",
+        "internal/httpapi/upstream.go",
+        "internal/server/config.go",
+        "internal/server/handler.go",
+        "internal/server/listener.go",
+        "internal/server/server.go"
+      ],
+      "sha256": "8123035e9dd811e4be4d8dc5977fba787ed72376cf237690076360682f3853e4"
+    },
+    "generator": {
+      "files": [
+        "tools/render_readme_visuals/demo.go",
+        "tools/render_readme_visuals/main.go",
+        "tools/render_readme_visuals/render.go"
+      ],
+      "sha256": "39d800e7eec4aaee909d63f2b7caa089907b5c0b968acae0b6f34bc5a3787b5d"
+    },
+    "policy_example": {
+      "path": "configs/policy.example.json",
+      "sha256": "6faed008e04a08d23471a15d35c217482d5ce07f397c8ffbbbf5e3070ad72b4e"
+    },
+    "scope": "source and artifact digests support deterministic review; they are not signatures or attestations"
+  },
+  "artifacts": {
+    "loopback-evidence.json": {
+      "bytes": 1174,
+      "sha256": "8bc6972765c3f1460207e97b77211ddf3f3e242714be440db42c23b8fda91c6d"
+    },
+    "loopback-evidence.txt": {
+      "bytes": 520,
+      "sha256": "f05b1ea53b38654bac4450a24cb50b46da6523f816f81781ca414cf56378bd41"
+    },
+    "loopback-terminal.svg": {
+      "bytes": 2628,
+      "sha256": "e76beb962c8fcf8d562f7418ae5f3097a6b204a5e596ac20374e167fd96f5368"
+    },
+    "stream-sequence.svg": {
+      "bytes": 5798,
+      "sha256": "12647c767f6bb359637cd4e12024eb350b40c06b93bdb2afbe229b7383bb8789"
+    }
+  }
+}

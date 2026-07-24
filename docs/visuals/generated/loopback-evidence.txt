@@ -1,0 +1,9 @@
+$ go run ./tools/render_readme_visuals
+validate: gateway policy is valid
+validate boundary: port stayed reserved; upstream calls 0
+buffered relay: HTTP/1 200; exact validated body; safe headers
+stream relay: chunk-1 -> chunk-2 -> [DONE] -> clean-eof
+stream ordering: first chunk arrived before upstream release
+credential boundary: tenant absent upstream; upstream absent downstream
+header boundary: client and upstream private headers stripped
+shutdown: SIGTERM -> exit 0; in-flight stream completed; listener released

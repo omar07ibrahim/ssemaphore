@@ -1,0 +1,46 @@
+{
+  "schema": "ssemaphore.loopback-evidence.v1",
+  "scope": "one Linux gateway instance, one tenant, two synthetic numeric-loopback requests",
+  "toolchain": "go1.26.5",
+  "platform": "linux",
+  "validate": {
+    "accepted": true,
+    "listener_remained_reserved": true,
+    "upstream_connections": 0
+  },
+  "buffered": {
+    "status": 200,
+    "protocol_major": 1,
+    "upstream_attempts": 1,
+    "body_exact": true,
+    "safe_response_headers": true
+  },
+  "streaming": {
+    "status": 200,
+    "protocol_major": 1,
+    "upstream_attempts": 1,
+    "first_event_before_upstream_release": true,
+    "event_order": [
+      "chunk-1",
+      "chunk-2",
+      "[DONE]"
+    ],
+    "clean_eof": true,
+    "safe_response_headers": true
+  },
+  "isolation": {
+    "upstream_header_allowlist_exact": true,
+    "separate_upstream_credential": true,
+    "tenant_credential_forwarded": false,
+    "client_headers_forwarded": false,
+    "upstream_headers_relayed": false,
+    "upstream_credential_relayed": false
+  },
+  "shutdown": {
+    "signal": "SIGTERM",
+    "inflight_stream_completed": true,
+    "exit_code": 0,
+    "process_output_empty": true,
+    "listener_released": true
+  }
+}
