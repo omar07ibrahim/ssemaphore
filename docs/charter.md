@@ -5,12 +5,12 @@ support. A feature is out of scope unless it strengthens bounded admission,
 request lifecycle correctness, or the observability of those decisions.
 
 > **Implementation checkpoint:** the request contract, admission scheduler,
-> injected non-streaming HTTP lifecycle, fixed-destination upstream HTTP
-> transport, bounded inbound server, strict Linux policy loader, loopback
-> listener selection, and signal-owned command now run as one tested path. The
-> repository does not yet contain a streaming relay, telemetry, or restart
-> journal. Controls below that depend on those components remain release
-> targets rather than current claims.
+> injected streaming and non-streaming HTTP lifecycle, fixed-destination
+> upstream HTTP transport, bounded inbound server, strict Linux policy loader,
+> loopback listener selection, and signal-owned command now run as one tested
+> path. The repository does not yet contain telemetry or a restart journal.
+> Controls below that depend on those components remain release targets rather
+> than current claims.
 
 ## Product claim
 
@@ -197,6 +197,16 @@ plus one byte, validates one JSON object whose `object` field is exactly
 then commits a `200`. It relays no upstream header. Invalid metadata, read
 failure, malformed JSON, duplicate keys, wrong object type, trailing data,
 oversize data, and close failure become the same static `502` before commit.
+
+The implemented streaming path accepts only unencoded `text/event-stream` and
+retains one complete wire event at a time. Total bytes, event bytes, event
+count, each upstream read, each event, and the whole upstream exchange are all
+finite. Every event has exactly one lowercase `data:` field; normal payloads
+are strict `chat.completion.chunk` objects. Each validated chunk is flushed
+before another event is decoded. Physical read-ahead is bounded by a fixed
+buffer no larger than the configured event and total envelopes. The exact
+`[DONE]` event remains buffered until clean EOF and successful body close rule
+out trailing data.
 
 Before response commitment, a gateway failure is a typed JSON error. After a
 stream begins, the HTTP status cannot be changed; the gateway cancels upstream,

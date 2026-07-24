@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "listener": {
     "type": "tcp",
     "host": "127.0.0.1",
@@ -67,7 +67,11 @@
     "default_queue_timeout_ms": 5000,
     "body_read_timeout_ms": 10000,
     "upstream_timeout_ms": 120000,
+    "stream_read_timeout_ms": 15000,
+    "stream_event_timeout_ms": 30000,
     "max_response_body_bytes": 8388608,
+    "max_stream_event_bytes": 1048576,
+    "max_stream_events": 8192,
     "global_pre_dispatch_count": 16
   },
   "upstream": {

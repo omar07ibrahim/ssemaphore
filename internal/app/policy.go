@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	policySchemaVersion       = 1
+	policySchemaVersion       = 2
 	maximumPolicyTenants      = 1024
 	maximumPolicyCredentials  = 4096
 	maximumPolicyTimeoutMS    = 3_600_000
@@ -76,7 +76,11 @@ type httpPolicy struct {
 	DefaultQueueTimeoutMS  uint64 `json:"default_queue_timeout_ms"`
 	BodyReadTimeoutMS      uint64 `json:"body_read_timeout_ms"`
 	UpstreamTimeoutMS      uint64 `json:"upstream_timeout_ms"`
+	StreamReadTimeoutMS    uint64 `json:"stream_read_timeout_ms"`
+	StreamEventTimeoutMS   uint64 `json:"stream_event_timeout_ms"`
 	MaxResponseBodyBytes   uint64 `json:"max_response_body_bytes"`
+	MaxStreamEventBytes    uint64 `json:"max_stream_event_bytes"`
+	MaxStreamEvents        uint64 `json:"max_stream_events"`
 	GlobalPreDispatchCount uint64 `json:"global_pre_dispatch_count"`
 }
 
@@ -178,11 +182,23 @@ func validatePolicy(document policyDocument) (*validatedPolicy, error) {
 	if !ok {
 		return nil, errPolicyRejected
 	}
+	streamReadTimeout, ok := policyDuration(document.HTTP.StreamReadTimeoutMS, maximumPolicyTimeoutMS)
+	if !ok {
+		return nil, errPolicyRejected
+	}
+	streamEventTimeout, ok := policyDuration(document.HTTP.StreamEventTimeoutMS, maximumPolicyTimeoutMS)
+	if !ok {
+		return nil, errPolicyRejected
+	}
 	httpConfig := httpapi.Config{
 		DefaultQueueTimeout:    defaultQueueTimeout,
 		BodyReadTimeout:        bodyReadTimeout,
 		UpstreamTimeout:        upstreamTimeout,
+		StreamReadTimeout:      streamReadTimeout,
+		StreamEventTimeout:     streamEventTimeout,
 		MaxResponseBodyBytes:   document.HTTP.MaxResponseBodyBytes,
+		MaxStreamEventBytes:    document.HTTP.MaxStreamEventBytes,
+		MaxStreamEvents:        document.HTTP.MaxStreamEvents,
 		GlobalPreDispatchLimit: document.HTTP.GlobalPreDispatchCount,
 		TenantPreDispatch:      tenantLimits,
 	}

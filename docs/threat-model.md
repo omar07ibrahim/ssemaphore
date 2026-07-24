@@ -7,8 +7,9 @@ inference upstream.
 > **Current checkpoint:** strict request parsing, bounded admission, bearer to
 > tenant mapping, pre-dispatch slots, fixed-destination upstream transport,
 > bounded inbound HTTP serving, strict Linux policy loading, loopback listener
-> selection, and signal-owned invocation are implemented as one runnable path.
-> SSE, telemetry, and persistence below remain target controls.
+> selection, signal-owned invocation, and a bounded-read-ahead SSE relay are
+> implemented as one runnable path. Telemetry and persistence below remain
+> target controls.
 
 ## Assets
 
@@ -111,16 +112,18 @@ The upstream may hang before headers, stream forever, emit an oversized event,
 truncate JSON, omit `[DONE]`, lie about content type, or return sensitive
 headers.
 
-Implemented non-streaming controls: one finite upstream deadline; exact status,
-content-type, and content-encoding checks; a 16 MiB hard response ceiling above
-the lower configured limit; UTF-8, Unicode escape, nesting, duplicate-key,
-trailing-value, and exact object checks; full validation before commitment; no
-upstream response headers; one terminal cleanup owner; and no retry. The
-transport additionally bounds connect, TLS-handshake, response-header,
-idle-connection, header-byte, and connection-count resources; disables
-parallel IPv4/IPv6 fallback, redirects, and decompression; and requires TLS 1.2
-or newer for every HTTPS connection. SSE idle, event, and total-stream controls
-remain part of the streaming milestone.
+Implemented controls: one finite upstream deadline; exact status, content-type,
+and content-encoding checks; a 16 MiB hard response ceiling above the lower
+configured limit; UTF-8, Unicode escape, nesting, duplicate-key,
+trailing-value, and exact object checks; no upstream response headers; one
+terminal cleanup owner; and no retry. Non-streaming JSON is fully validated
+before commitment. SSE adds finite total-byte, event-byte, event-count,
+read-idle, event, and total-stream limits; strict single-field framing; one
+retained event; chunk-before-terminal ordering; and clean EOF verification
+before `[DONE]` is flushed. The transport additionally bounds connect,
+TLS-handshake, response-header, idle-connection, header-byte, and
+connection-count resources; disables parallel IPv4/IPv6 fallback, redirects,
+and decompression; and requires TLS 1.2 or newer for every HTTPS connection.
 
 ### Client disconnects and slow readers
 

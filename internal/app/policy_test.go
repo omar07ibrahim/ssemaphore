@@ -70,7 +70,11 @@ func TestParsePolicyMapsEveryValidatedField(t *testing.T) {
 		DefaultQueueTimeout:    5 * time.Second,
 		BodyReadTimeout:        10 * time.Second,
 		UpstreamTimeout:        2 * time.Minute,
+		StreamReadTimeout:      15 * time.Second,
+		StreamEventTimeout:     30 * time.Second,
 		MaxResponseBodyBytes:   8_388_608,
+		MaxStreamEventBytes:    1_048_576,
+		MaxStreamEvents:        8_192,
 		GlobalPreDispatchLimit: 16,
 		TenantPreDispatch: []httpapi.TenantPreDispatchLimit{
 			{Tenant: 1, Count: 8},
@@ -179,7 +183,8 @@ func TestParsePolicyRejectsSchemaListenerAndContractViolations(t *testing.T) {
 		name   string
 		mutate func(*policyDocument)
 	}{
-		{name: "unsupported schema version", mutate: func(d *policyDocument) { d.SchemaVersion = 2 }},
+		{name: "legacy schema version", mutate: func(d *policyDocument) { d.SchemaVersion = 1 }},
+		{name: "future schema version", mutate: func(d *policyDocument) { d.SchemaVersion = policySchemaVersion + 1 }},
 		{name: "unsupported listener type", mutate: func(d *policyDocument) { d.Listener.Type = "unix" }},
 		{name: "wildcard listener", mutate: func(d *policyDocument) { d.Listener.Host = "0.0.0.0" }},
 		{name: "DNS listener", mutate: func(d *policyDocument) { d.Listener.Host = "localhost" }},
@@ -216,6 +221,8 @@ func TestParsePolicyRejectsEveryTimeoutOutsidePolicyBounds(t *testing.T) {
 		{name: "HTTP default queue", maximum: maximumPolicyTimeoutMS, set: func(d *policyDocument, value uint64) { d.HTTP.DefaultQueueTimeoutMS = value }},
 		{name: "HTTP body read", maximum: maximumPolicyTimeoutMS, set: func(d *policyDocument, value uint64) { d.HTTP.BodyReadTimeoutMS = value }},
 		{name: "HTTP upstream", maximum: maximumPolicyTimeoutMS, set: func(d *policyDocument, value uint64) { d.HTTP.UpstreamTimeoutMS = value }},
+		{name: "HTTP stream read", maximum: maximumPolicyTimeoutMS, set: func(d *policyDocument, value uint64) { d.HTTP.StreamReadTimeoutMS = value }},
+		{name: "HTTP stream event", maximum: maximumPolicyTimeoutMS, set: func(d *policyDocument, value uint64) { d.HTTP.StreamEventTimeoutMS = value }},
 		{name: "upstream connect", maximum: maximumPolicyTimeoutMS, set: func(d *policyDocument, value uint64) { d.Upstream.ConnectTimeoutMS = value }},
 		{name: "upstream TLS handshake", maximum: maximumPolicyTimeoutMS, set: func(d *policyDocument, value uint64) { d.Upstream.TLSHandshakeTimeoutMS = value }},
 		{name: "upstream response header", maximum: maximumPolicyTimeoutMS, set: func(d *policyDocument, value uint64) { d.Upstream.ResponseHeaderTimeoutMS = value }},
@@ -379,6 +386,10 @@ func TestParsePolicyRejectsUpstreamResponseAndServerBounds(t *testing.T) {
 		}},
 		{name: "zero response body limit", mutate: func(d *policyDocument) { d.HTTP.MaxResponseBodyBytes = 0 }},
 		{name: "response body above hard bound", mutate: func(d *policyDocument) { d.HTTP.MaxResponseBodyBytes = contract.AbsoluteMaxResponseBodyBytes + 1 }},
+		{name: "zero stream event bytes", mutate: func(d *policyDocument) { d.HTTP.MaxStreamEventBytes = 0 }},
+		{name: "stream event above total response bytes", mutate: func(d *policyDocument) { d.HTTP.MaxStreamEventBytes = d.HTTP.MaxResponseBodyBytes + 1 }},
+		{name: "stream event count below chunk and done", mutate: func(d *policyDocument) { d.HTTP.MaxStreamEvents = 1 }},
+		{name: "stream event count above hard bound", mutate: func(d *policyDocument) { d.HTTP.MaxStreamEvents = contract.AbsoluteMaxSSEEvents + 1 }},
 		{name: "zero upstream response header bytes", mutate: func(d *policyDocument) { d.Upstream.MaxResponseHeaderBytes = 0 }},
 		{name: "upstream response header bytes above hard bound", mutate: func(d *policyDocument) { d.Upstream.MaxResponseHeaderBytes = (1 << 20) + 1 }},
 		{name: "upstream response header bytes above int64", mutate: func(d *policyDocument) { d.Upstream.MaxResponseHeaderBytes = math.MaxUint64 }},
@@ -416,9 +427,9 @@ func TestParsePolicyReducesDocumentFailuresToStaticError(t *testing.T) {
 		data []byte
 	}{
 		{name: "top-level null", data: []byte(`null`)},
-		{name: "null listener", data: []byte(`{"schema_version":1,"listener":null}`)},
+		{name: "null listener", data: []byte(`{"schema_version":2,"listener":null}`)},
 		{name: "missing server", data: missingServer},
-		{name: "unknown canary", data: []byte(`{"schema_version":1,"UNKNOWN_POLICY_CANARY":"SECRET_POLICY_CANARY"}`)},
+		{name: "unknown canary", data: []byte(`{"schema_version":2,"UNKNOWN_POLICY_CANARY":"SECRET_POLICY_CANARY"}`)},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -520,7 +531,7 @@ func marshalPolicyDocument(t *testing.T, document policyDocument) []byte {
 
 func canonicalPolicyDocument() policyDocument {
 	return policyDocument{
-		SchemaVersion: 1,
+		SchemaVersion: policySchemaVersion,
 		Listener: listenerPolicy{
 			Type: "tcp",
 			Host: "127.0.0.1",
@@ -570,7 +581,11 @@ func canonicalPolicyDocument() policyDocument {
 			DefaultQueueTimeoutMS:  5_000,
 			BodyReadTimeoutMS:      10_000,
 			UpstreamTimeoutMS:      120_000,
+			StreamReadTimeoutMS:    15_000,
+			StreamEventTimeoutMS:   30_000,
 			MaxResponseBodyBytes:   8_388_608,
+			MaxStreamEventBytes:    1_048_576,
+			MaxStreamEvents:        8_192,
 			GlobalPreDispatchCount: 16,
 		},
 		Upstream: upstreamPolicy{

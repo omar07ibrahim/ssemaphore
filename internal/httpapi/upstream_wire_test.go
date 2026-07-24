@@ -85,6 +85,10 @@ func upstreamWireNew(t *testing.T, config HTTPUpstreamConfig, token string) *HTT
 }
 
 func upstreamWireRequest(t *testing.T) contract.Request {
+	return upstreamWireRequestBody(t, upstreamWireBody)
+}
+
+func upstreamWireRequestBody(t *testing.T, body string) contract.Request {
 	t.Helper()
 	parser, err := contract.NewParser("local-model", contract.Limits{
 		MaxBodyBytes:        2048,
@@ -97,11 +101,64 @@ func upstreamWireRequest(t *testing.T) contract.Request {
 	if err != nil {
 		t.Fatalf("NewParser() error = %v", err)
 	}
-	request, err := parser.Parse(context.Background(), strings.NewReader(upstreamWireBody))
+	request, err := parser.Parse(context.Background(), strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
 	return request
+}
+
+func TestHTTPUpstreamSelectsAcceptFromValidatedRequestMode(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       string
+		wantAccept string
+	}{
+		{name: "non-streaming", body: upstreamWireBody, wantAccept: "application/json"},
+		{
+			name:       "streaming",
+			body:       `{"model":"local-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":8,"stream":true}`,
+			wantAccept: "text/event-stream",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			observed := make(chan upstreamWireObservation, 1)
+			var calls atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				calls.Add(1)
+				observed <- upstreamWireObserve(request)
+				writer.Header().Set("Content-Type", test.wantAccept)
+				_, _ = io.WriteString(writer, "response")
+			}))
+			defer server.Close()
+
+			upstream := upstreamWireNew(t, upstreamWireConfig(upstreamWireEndpoint(server)), upstreamWireToken)
+			response, err := upstream.Complete(upstreamWireContext(t), upstreamWireRequestBody(t, test.body))
+			if err != nil {
+				t.Fatalf("Complete() error = %v", err)
+			}
+			if err := response.Body.Close(); err != nil {
+				t.Fatalf("response Body.Close() error = %v", err)
+			}
+
+			observation := <-observed
+			if got := observation.header.Get("Accept"); got != test.wantAccept {
+				t.Fatalf("Accept = %q, want %q", got, test.wantAccept)
+			}
+			if observation.header.Get("Authorization") != "Bearer "+upstreamWireToken ||
+				observation.header.Get("Content-Type") != "application/json" {
+				t.Fatalf("outbound headers = %#v, want fixed credential and JSON request", observation.header)
+			}
+			if got := string(observation.body); got != test.body {
+				t.Fatalf("body = %q, want exact %q", got, test.body)
+			}
+			if calls.Load() != 1 {
+				t.Fatalf("upstream calls = %d, want exactly 1", calls.Load())
+			}
+		})
+	}
 }
 
 func upstreamWireContext(t *testing.T) context.Context {

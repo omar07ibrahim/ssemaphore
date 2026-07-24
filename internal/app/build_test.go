@@ -374,7 +374,11 @@ func buildTestPolicy(t *testing.T, port uint16) *validatedPolicy {
 			DefaultQueueTimeout:    time.Second,
 			BodyReadTimeout:        time.Second,
 			UpstreamTimeout:        time.Second,
+			StreamReadTimeout:      250 * time.Millisecond,
+			StreamEventTimeout:     500 * time.Millisecond,
 			MaxResponseBodyBytes:   512,
+			MaxStreamEventBytes:    256,
+			MaxStreamEvents:        64,
 			GlobalPreDispatchLimit: 1,
 			TenantPreDispatch: []httpapi.TenantPreDispatchLimit{{
 				Tenant: 1,

@@ -28,7 +28,10 @@ type validatedHandlerConfig struct {
 	defaultQueueTimeout time.Duration
 	bodyReadTimeout     time.Duration
 	upstreamTimeout     time.Duration
+	streamReadTimeout   time.Duration
+	streamEventTimeout  time.Duration
 	responseValidator   *contract.ResponseValidator
+	sseLimits           contract.SSELimits
 	globalSlots         chan struct{}
 	tenantSlots         map[admission.TenantID]chan struct{}
 	credentials         []storedCredential
@@ -108,12 +111,32 @@ func validateHandlerConfig(
 	if err := validatePolicyTimeout("upstream", config.UpstreamTimeout, absoluteMaxPolicyTimeout); err != nil {
 		return validatedHandlerConfig{}, err
 	}
+	if err := validatePolicyTimeout("stream read", config.StreamReadTimeout, absoluteMaxPolicyTimeout); err != nil {
+		return validatedHandlerConfig{}, err
+	}
+	if err := validatePolicyTimeout("stream event", config.StreamEventTimeout, absoluteMaxPolicyTimeout); err != nil {
+		return validatedHandlerConfig{}, err
+	}
+	if config.StreamReadTimeout > config.StreamEventTimeout {
+		return validatedHandlerConfig{}, errors.New("stream read timeout exceeds stream event timeout")
+	}
+	if config.StreamEventTimeout > config.UpstreamTimeout {
+		return validatedHandlerConfig{}, errors.New("stream event timeout exceeds upstream timeout")
+	}
 
 	responseValidator, err := contract.NewResponseValidator(contract.ResponseLimits{
 		MaxBodyBytes: config.MaxResponseBodyBytes,
 	})
 	if err != nil {
 		return validatedHandlerConfig{}, fmt.Errorf("response limits: %w", err)
+	}
+	sseLimits := contract.SSELimits{
+		MaxTotalBytes: config.MaxResponseBodyBytes,
+		MaxEventBytes: config.MaxStreamEventBytes,
+		MaxEvents:     config.MaxStreamEvents,
+	}
+	if err := contract.ValidateSSELimits(sseLimits); err != nil {
+		return validatedHandlerConfig{}, fmt.Errorf("SSE limits: %w", err)
 	}
 	if config.GlobalPreDispatchLimit == 0 || config.GlobalPreDispatchLimit > absoluteMaxPreDispatchCount {
 		return validatedHandlerConfig{}, errors.New("global pre-dispatch count is outside the hard safety bounds")
@@ -191,7 +214,10 @@ func validateHandlerConfig(
 		defaultQueueTimeout: config.DefaultQueueTimeout,
 		bodyReadTimeout:     config.BodyReadTimeout,
 		upstreamTimeout:     config.UpstreamTimeout,
+		streamReadTimeout:   config.StreamReadTimeout,
+		streamEventTimeout:  config.StreamEventTimeout,
 		responseValidator:   responseValidator,
+		sseLimits:           sseLimits,
 		globalSlots:         make(chan struct{}, int(config.GlobalPreDispatchLimit)),
 		tenantSlots:         tenantSlots,
 		credentials:         credentials,

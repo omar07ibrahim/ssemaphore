@@ -41,6 +41,18 @@ trailing values, invalid UTF-8, unpaired surrogates, fractional integers, and
 out-of-range resource values are rejected. Every duration is an explicit
 positive integer number of milliseconds.
 
+Schema version `2` introduces the mandatory SSE timeout and size fields shown
+in the example. Version `1` policies are rejected rather than silently gaining
+streaming defaults; operators must review and add the new bounds explicitly.
+
+The HTTP policy uses `max_response_body_bytes` as both the buffered-response
+limit and the total SSE wire-byte limit. `max_stream_event_bytes` bounds the
+single retained event and cannot exceed that total; `max_stream_events` counts
+chunks and the terminal marker. `stream_read_timeout_ms` bounds one actual
+upstream read, `stream_event_timeout_ms` bounds one complete event, and both
+must fit inside `upstream_timeout_ms`, which remains the hard total exchange
+deadline.
+
 Diagnostics deliberately use fixed categories and never echo a field, path,
 endpoint, environment name, raw decoder error, or rejected value. When
 `validate` rejects a setup, check file ownership/mode first, then the exact env
@@ -109,6 +121,17 @@ curl --fail-with-body --http1.1 --silent --show-error \
 ```
 
 The exact accepted and rejected fields are in [the API contract](api.md).
+
+To exercise the streaming path, add `"stream":true` and disable client-side
+output buffering:
+
+```sh
+curl --fail-with-body --http1.1 --no-buffer --silent --show-error \
+  -H "Authorization: Bearer $SSEMAPHORE_TENANT_1_TOKEN" \
+  -H 'Content-Type: application/json' \
+  --data '{"model":"portfolio-model","messages":[{"role":"user","content":"stream safely"}],"max_completion_tokens":64,"stream":true}' \
+  http://127.0.0.1:18080/v1/chat/completions
+```
 
 Exit codes are stable:
 
