@@ -21,6 +21,8 @@ const (
 	visualTranscriptName   = "loopback-evidence.txt"
 	visualTerminalName     = "loopback-terminal.svg"
 	visualSequenceName     = "stream-sequence.svg"
+	visualArchitectureName = "architecture.svg"
+	visualSetupName        = "setup-workflow.svg"
 	visualExpectedGo       = "go1.26.5"
 	visualExpectedOS       = "linux"
 )
@@ -189,6 +191,8 @@ func buildVisualArtifacts(root string, evidence demoEvidence) (map[string][]byte
 		visualTranscriptName:   transcript,
 		visualTerminalName:     []byte(renderTerminalSVG(string(transcript))),
 		visualSequenceName:     []byte(renderSequenceSVG(evidence)),
+		visualArchitectureName: []byte(renderArchitectureSVG()),
+		visualSetupName:        []byte(renderSetupWorkflowSVG()),
 	}
 	for name, payload := range artifacts {
 		if err := ensureVisualPublishable(string(payload)); err != nil {
@@ -198,7 +202,12 @@ func buildVisualArtifacts(root string, evidence demoEvidence) (map[string][]byte
 
 	engine, err := digestVisualSources(
 		root,
-		[]string{".go-version", "go.mod", "configs/policy.example.json"},
+		[]string{
+			".go-version",
+			"go.mod",
+			"configs/policy.example.json",
+			"docs/running.md",
+		},
 		[]string{"cmd", "internal"},
 		false,
 	)

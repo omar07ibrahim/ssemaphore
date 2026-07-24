@@ -12,6 +12,7 @@
         ".go-version",
         "cmd/ssemaphore/main.go",
         "configs/policy.example.json",
+        "docs/running.md",
         "go.mod",
         "internal/admission/clock.go",
         "internal/admission/config.go",
@@ -45,15 +46,17 @@
         "internal/server/listener.go",
         "internal/server/server.go"
       ],
-      "sha256": "8123035e9dd811e4be4d8dc5977fba787ed72376cf237690076360682f3853e4"
+      "sha256": "b24b690a0f7324da2e73148943a47a120bd68b6ade4f9e7a178d0facd7c7d86c"
     },
     "generator": {
       "files": [
+        "tools/render_readme_visuals/architecture.go",
         "tools/render_readme_visuals/demo.go",
         "tools/render_readme_visuals/main.go",
-        "tools/render_readme_visuals/render.go"
+        "tools/render_readme_visuals/render.go",
+        "tools/render_readme_visuals/setup.go"
       ],
-      "sha256": "39d800e7eec4aaee909d63f2b7caa089907b5c0b968acae0b6f34bc5a3787b5d"
+      "sha256": "444c081ba1287012f2db4fb4d5eaa203500540e2866743c47b611155f5a114cf"
     },
     "policy_example": {
       "path": "configs/policy.example.json",
@@ -62,6 +65,10 @@
     "scope": "source and artifact digests support deterministic review; they are not signatures or attestations"
   },
   "artifacts": {
+    "architecture.svg": {
+      "bytes": 18777,
+      "sha256": "e054b63798a31313521d896bfab03ba88b679633c36b87a18763c4b57e5dbbee"
+    },
     "loopback-evidence.json": {
       "bytes": 1174,
       "sha256": "8bc6972765c3f1460207e97b77211ddf3f3e242714be440db42c23b8fda91c6d"
@@ -73,6 +80,10 @@
     "loopback-terminal.svg": {
       "bytes": 2628,
       "sha256": "e76beb962c8fcf8d562f7418ae5f3097a6b204a5e596ac20374e167fd96f5368"
+    },
+    "setup-workflow.svg": {
+      "bytes": 8234,
+      "sha256": "f8bb79da61c4f156ea318cf1590752d024ed2d2f21a2efd40acfa0c1025760ac"
     },
     "stream-sequence.svg": {
       "bytes": 5798,

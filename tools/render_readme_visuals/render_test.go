@@ -71,8 +71,8 @@ func TestVisualArtifactsAreDeterministicAccessibleAndSelfContained(t *testing.T)
 	if err != nil {
 		t.Fatalf("buildVisualArtifacts(second) error = %v", err)
 	}
-	if len(first) != 5 || len(second) != len(first) {
-		t.Fatalf("artifact counts = %d/%d, want 5/5", len(first), len(second))
+	if len(first) != 7 || len(second) != len(first) {
+		t.Fatalf("artifact counts = %d/%d, want 7/7", len(first), len(second))
 	}
 	for name, payload := range first {
 		if string(second[name]) != string(payload) {
@@ -83,7 +83,12 @@ func TestVisualArtifactsAreDeterministicAccessibleAndSelfContained(t *testing.T)
 		}
 	}
 
-	for _, name := range []string{visualTerminalName, visualSequenceName} {
+	for _, name := range []string{
+		visualTerminalName,
+		visualSequenceName,
+		visualArchitectureName,
+		visualSetupName,
+	} {
 		payload := string(first[name])
 		decoder := xml.NewDecoder(strings.NewReader(payload))
 		for {
@@ -110,6 +115,30 @@ func TestVisualArtifactsAreDeterministicAccessibleAndSelfContained(t *testing.T)
 		}
 		if strings.Contains(payload, `font-family="Deja Sans`) {
 			t.Fatalf("%s contains a misspelled font fallback", name)
+		}
+	}
+
+	architecture := string(first[visualArchitectureName])
+	for _, required := range []string{
+		"PREDISPATCH COUNT SLOTS",
+		"count + exact body bytes + estimated work",
+		"count + work only (NO BYTES)",
+		"FUTURE - NOT IMPLEMENTED",
+	} {
+		if !strings.Contains(architecture, required) {
+			t.Fatalf("%s is missing exact boundary %q", visualArchitectureName, required)
+		}
+	}
+	setup := string(first[visualSetupName])
+	for _, required := range []string{
+		"Go 1.26.5",
+		"mode 0700",
+		"exact mode 0600",
+		"gateway policy is valid",
+		"Replace the example upstream endpoint before serving.",
+	} {
+		if !strings.Contains(setup, required) {
+			t.Fatalf("%s is missing workflow fact %q", visualSetupName, required)
 		}
 	}
 

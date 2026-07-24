@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="650" viewBox="0 0 1400 650" role="img" aria-labelledby="title desc">
+  <title id="title">SSEmaphore secure setup workflow</title>
+  <desc id="desc">Six numbered cards show the Linux build, private policy installation, schema review, runtime-only credential names, side-effect-free validation, and buffered or streaming service flow through handled signal drain.</desc>
+  <style>
+    .title { font-family: "DejaVu Sans", sans-serif; fill: #f0f6fc; }
+    .header-muted { font-family: "DejaVu Sans", sans-serif; fill: #8c959f; }
+    .text { font-family: "DejaVu Sans", sans-serif; fill: #24292f; }
+    .muted { font-family: "DejaVu Sans", sans-serif; fill: #57606a; }
+    .code { font-family: "DejaVu Sans Mono", ui-monospace, monospace; fill: #0d1117; }
+    .card { fill: #ffffff; stroke: #d0d7de; stroke-width: 2; }
+    .step { fill: #0969da; }
+    .flow { fill: none; stroke: #0969da; stroke-width: 2.5; }
+  </style>
+  <rect width="1400" height="650" rx="20" fill="#0d1117"/>
+  <rect x="0" y="84" width="1400" height="566" fill="#f6f8fa"/>
+  <text x="40" y="42" class="title" font-size="28" font-weight="700">SSEmaphore: secure local setup to handled drain</text>
+  <text x="40" y="69" class="header-muted" font-size="15">Six repository-backed steps; credentials remain runtime-only and the listener remains numeric-loopback-only.</text>
+
+  <rect x="40" y="105" width="426" height="205" rx="14" class="card"/>
+  <circle cx="73" cy="139" r="20" class="step"/>
+  <text x="73" y="146" class="title" text-anchor="middle" font-size="19" font-weight="700">1</text>
+  <text x="105" y="146" class="text" font-size="20" font-weight="700">Build on Linux</text>
+  <text x="61" y="178" class="muted" font-size="15">Linux toolchain: Go 1.26.5</text>
+  <rect x="61" y="193" width="384" height="88" rx="9" fill="#f6f8fa" stroke="#afb8c1"/>
+  <text x="78" y="224" class="code" font-size="14">$ mkdir -p bin</text>
+  <text x="78" y="254" class="code" font-size="13">$ go build -o bin/ssemaphore ./cmd/ssemaphore</text>
+  <text x="61" y="298" class="muted" font-size="13">Produces the repository's single gateway binary.</text>
+
+  <rect x="487" y="105" width="426" height="205" rx="14" class="card"/>
+  <circle cx="520" cy="139" r="20" class="step"/>
+  <text x="520" y="146" class="title" text-anchor="middle" font-size="19" font-weight="700">2</text>
+  <text x="552" y="146" class="text" font-size="20" font-weight="700">Install a private policy</text>
+  <text x="508" y="180" class="text" font-size="15" font-weight="700">Private directory</text>
+  <text x="875" y="180" class="text" text-anchor="end" font-size="15">mode 0700</text>
+  <line x1="508" y1="191" x2="892" y2="191" stroke="#d8dee4"/>
+  <text x="508" y="217" class="text" font-size="15" font-weight="700">Policy file</text>
+  <text x="875" y="217" class="text" text-anchor="end" font-size="15">exact mode 0600</text>
+  <line x1="508" y1="228" x2="892" y2="228" stroke="#d8dee4"/>
+  <text x="508" y="254" class="text" font-size="14">Absolute, clean, regular path</text>
+  <text x="508" y="278" class="text" font-size="14">Owned by the process user; no symlink components</text>
+  <text x="508" y="299" class="muted" font-size="13">Start from configs/policy.example.json.</text>
+
+  <rect x="934" y="105" width="426" height="205" rx="14" class="card"/>
+  <circle cx="967" cy="139" r="20" class="step"/>
+  <text x="967" y="146" class="title" text-anchor="middle" font-size="19" font-weight="700">3</text>
+  <text x="999" y="146" class="text" font-size="20" font-weight="700">Review schema 2</text>
+  <text x="955" y="178" class="text" font-size="14">numeric loopback listener + fixed port</text>
+  <text x="955" y="201" class="text" font-size="14">contract and HTTP/SSE limits</text>
+  <text x="955" y="224" class="text" font-size="14">global + tenant queue/inflight limits</text>
+  <text x="955" y="247" class="text" font-size="14">tenant weights and pre-dispatch bounds</text>
+  <text x="955" y="270" class="text" font-size="14">upstream endpoint + transport bounds</text>
+  <text x="955" y="293" class="text" font-size="14">server timeouts + connection limit</text>
+
+  <rect x="40" y="330" width="426" height="205" rx="14" class="card"/>
+  <circle cx="73" cy="364" r="20" class="step"/>
+  <text x="73" y="371" class="title" text-anchor="middle" font-size="19" font-weight="700">4</text>
+  <text x="105" y="371" class="text" font-size="19" font-weight="700">Supply runtime-only credentials</text>
+  <text x="61" y="401" class="muted" font-size="13">Use only the names committed in the example policy:</text>
+  <rect x="61" y="413" width="384" height="82" rx="9" fill="#f6f8fa" stroke="#afb8c1"/>
+  <text x="76" y="437" class="code" font-size="13">SSEMAPHORE_TENANT_1_TOKEN</text>
+  <text x="76" y="459" class="code" font-size="13">SSEMAPHORE_TENANT_2_TOKEN</text>
+  <text x="76" y="481" class="code" font-size="13">SSEMAPHORE_UPSTREAM_BEARER_TOKEN</text>
+  <text x="61" y="519" class="muted" font-size="13">Values are never stored in policy; all three must be distinct.</text>
+
+  <rect x="487" y="330" width="426" height="205" rx="14" class="card"/>
+  <circle cx="520" cy="364" r="20" class="step"/>
+  <text x="520" y="371" class="title" text-anchor="middle" font-size="19" font-weight="700">5</text>
+  <text x="552" y="371" class="text" font-size="20" font-weight="700">Validate without binding</text>
+  <rect x="508" y="391" width="384" height="75" rx="9" fill="#f6f8fa" stroke="#afb8c1"/>
+  <text x="522" y="417" class="code" font-size="12">$ ./bin/ssemaphore validate --config "$POLICY_PATH"</text>
+  <text x="522" y="448" font-family="DejaVu Sans, sans-serif" fill="#1a7f37" font-size="14" font-weight="700">gateway policy is valid</text>
+  <rect x="508" y="480" width="181" height="34" rx="17" fill="#dafbe1"/>
+  <text x="598" y="502" class="text" text-anchor="middle" font-size="13">no listener bind</text>
+  <rect x="701" y="480" width="191" height="34" rx="17" fill="#dafbe1"/>
+  <text x="796" y="502" class="text" text-anchor="middle" font-size="13">no DNS or outbound dial</text>
+
+  <rect x="934" y="330" width="426" height="205" rx="14" class="card"/>
+  <circle cx="967" cy="364" r="20" class="step"/>
+  <text x="967" y="371" class="title" text-anchor="middle" font-size="19" font-weight="700">6</text>
+  <text x="999" y="371" class="text" font-size="20" font-weight="700">Serve, call, then drain</text>
+  <text x="955" y="403" class="code" font-size="12">$ ./bin/ssemaphore serve --config "$POLICY_PATH"</text>
+  <rect x="955" y="424" width="72" height="58" rx="8" fill="#ddf4ff" stroke="#54aeff"/>
+  <text x="991" y="458" class="text" text-anchor="middle" font-size="13" font-weight="700">serve</text>
+  <path d="M 1027 453 L 1062 453" class="flow"/>
+  <path d="M 1055 447 L 1062 453 L 1055 459" class="flow"/>
+  <rect x="1063" y="414" width="112" height="35" rx="7" fill="#ffffff" stroke="#54aeff"/>
+  <text x="1119" y="437" class="text" text-anchor="middle" font-size="12">buffered call</text>
+  <rect x="1063" y="458" width="112" height="35" rx="7" fill="#ffffff" stroke="#54aeff"/>
+  <text x="1119" y="481" class="text" text-anchor="middle" font-size="12">streaming call</text>
+  <path d="M 1175 432 L 1190 432 L 1190 453 L 1204 453" class="flow"/>
+  <path d="M 1175 476 L 1190 476 L 1190 453" class="flow"/>
+  <path d="M 1197 447 L 1204 453 L 1197 459" class="flow"/>
+  <rect x="1205" y="424" width="134" height="58" rx="8" fill="#fbefff" stroke="#bf8fef"/>
+  <text x="1272" y="448" class="text" text-anchor="middle" font-size="12" font-weight="700">SIGINT / SIGTERM</text>
+  <text x="1272" y="468" class="text" text-anchor="middle" font-size="12">handled drain</text>
+  <text x="955" y="516" class="muted" font-size="13">Completed handled shutdown exits 0.</text>
+
+  <rect x="40" y="555" width="1320" height="70" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="61" y="582" class="text" font-size="14" font-weight="700">Sources: .go-version + go.mod + configs/policy.example.json + docs/running.md</text>
+  <text x="61" y="606" class="muted" font-size="14">Replace the example upstream endpoint before serving. Remote upstreams require HTTPS; the local listener stays numeric-loopback-only.</text>
+</svg>
