@@ -18,7 +18,7 @@ import (
 
 const (
 	visualEvidenceJSONName = "loopback-evidence.json"
-	visualTranscriptName   = "loopback-evidence.txt"
+	visualSummaryName      = "loopback-evidence.txt"
 	visualTerminalName     = "loopback-terminal.svg"
 	visualSequenceName     = "stream-sequence.svg"
 	visualArchitectureName = "architecture.svg"
@@ -64,6 +64,7 @@ type visualValidateEvidence struct {
 	Accepted                 bool `json:"accepted"`
 	ListenerRemainedReserved bool `json:"listener_remained_reserved"`
 	UpstreamConnections      int  `json:"upstream_connections"`
+	UpstreamHTTPRequests     int  `json:"upstream_http_requests"`
 }
 
 type visualBufferedEvidence struct {
@@ -146,7 +147,9 @@ func validateDemoEvidence(evidence demoEvidence) error {
 		return errors.New("unexpected operating system")
 	case evidence.ValidateStdout != "gateway policy is valid\n":
 		return errors.New("unexpected validate stdout")
-	case !evidence.ValidatePortStayedReserved || evidence.ValidateUpstreamCalls != 0:
+	case !evidence.ValidatePortStayedReserved ||
+		evidence.ValidateUpstreamConnections != 0 ||
+		evidence.ValidateUpstreamCalls != 0:
 		return errors.New("validate crossed a runtime boundary")
 	case evidence.BufferedStatus != 200 || evidence.BufferedProtocolMajor != 1:
 		return errors.New("unexpected buffered response")
@@ -185,11 +188,11 @@ func buildVisualArtifacts(root string, evidence demoEvidence) (map[string][]byte
 	}
 	evidenceJSON = append(evidenceJSON, '\n')
 
-	transcript := []byte(renderEvidenceTranscript(evidence))
+	summary := []byte(renderEvidenceSummary(evidence))
 	artifacts := map[string][]byte{
 		visualEvidenceJSONName: evidenceJSON,
-		visualTranscriptName:   transcript,
-		visualTerminalName:     []byte(renderTerminalSVG(string(transcript))),
+		visualSummaryName:      summary,
+		visualTerminalName:     []byte(renderTerminalSVG(string(summary))),
 		visualSequenceName:     []byte(renderSequenceSVG(evidence)),
 		visualArchitectureName: []byte(renderArchitectureSVG()),
 		visualSetupName:        []byte(renderSetupWorkflowSVG()),
@@ -232,7 +235,7 @@ func buildVisualArtifacts(root string, evidence demoEvidence) (map[string][]byte
 	manifest := visualManifest{
 		Schema: "ssemaphore.readme-visuals.v1",
 		Demo: visualManifestDemo{
-			Command:   "go run ./tools/render_readme_visuals",
+			Command:   "GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals",
 			Scope:     document.Scope,
 			Toolchain: evidence.GoVersion,
 			Platform:  evidence.OperatingSystem,
@@ -282,7 +285,8 @@ func evidenceDocument(evidence demoEvidence) visualEvidenceDocument {
 		Validate: visualValidateEvidence{
 			Accepted:                 true,
 			ListenerRemainedReserved: evidence.ValidatePortStayedReserved,
-			UpstreamConnections:      evidence.ValidateUpstreamCalls,
+			UpstreamConnections:      evidence.ValidateUpstreamConnections,
+			UpstreamHTTPRequests:     evidence.ValidateUpstreamCalls,
 		},
 		Buffered: visualBufferedEvidence{
 			Status:           evidence.BufferedStatus,
@@ -318,13 +322,14 @@ func evidenceDocument(evidence demoEvidence) visualEvidenceDocument {
 	}
 }
 
-func renderEvidenceTranscript(evidence demoEvidence) string {
+func renderEvidenceSummary(evidence demoEvidence) string {
 	return strings.Join(
 		[]string{
-			"$ go run ./tools/render_readme_visuals",
+			"verified run: GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals",
 			"validate: " + strings.TrimSuffix(evidence.ValidateStdout, "\n"),
 			fmt.Sprintf(
-				"validate boundary: port stayed reserved; upstream calls %d",
+				"validate boundary: port reserved; upstream connections %d; HTTP requests %d",
+				evidence.ValidateUpstreamConnections,
 				evidence.ValidateUpstreamCalls,
 			),
 			fmt.Sprintf(
@@ -346,8 +351,8 @@ func renderEvidenceTranscript(evidence demoEvidence) string {
 	)
 }
 
-func renderTerminalSVG(transcript string) string {
-	lines := strings.Split(strings.TrimSuffix(transcript, "\n"), "\n")
+func renderTerminalSVG(summary string) string {
+	lines := strings.Split(strings.TrimSuffix(summary, "\n"), "\n")
 	var body strings.Builder
 	body.WriteString(`  <rect width="1200" height="390" rx="17" fill="#0d1117"/>` + "\n")
 	body.WriteString(`  <circle cx="31" cy="29" r="7" fill="#ff5f56"/>` + "\n")
@@ -356,7 +361,7 @@ func renderTerminalSVG(transcript string) string {
 	body.WriteString(
 		`  <text x="600" y="36" fill="#8b949e" text-anchor="middle" ` +
 			`font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" ` +
-			`font-size="15">verified numeric-loopback evidence</text>` + "\n",
+			`font-size="15">verified numeric-loopback summary</text>` + "\n",
 	)
 	body.WriteString(`  <line x1="0" y1="54" x2="1200" y2="54" stroke="#30363d"/>` + "\n")
 	for index, line := range lines {
@@ -377,8 +382,8 @@ func renderTerminalSVG(transcript string) string {
 	return visualSVGDocument(
 		1200,
 		390,
-		"SSEmaphore verified loopback transcript",
-		"Content-free results from real validate, buffered relay, streaming relay, credential isolation, and SIGTERM shutdown checks.",
+		"SSEmaphore verified loopback summary",
+		"Content-free evidence summary derived from real validate, buffered relay, streaming relay, credential isolation, and SIGTERM shutdown checks.",
 		body.String(),
 	)
 }

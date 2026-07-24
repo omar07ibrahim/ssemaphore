@@ -24,7 +24,8 @@ func TestValidateDemoEvidenceRequiresEveryPublishedInvariant(t *testing.T) {
 		"operating system":      func(value *demoEvidence) { value.OperatingSystem = "not-linux" },
 		"validate output":       func(value *demoEvidence) { value.ValidateStdout = "accepted\n" },
 		"validate listener":     func(value *demoEvidence) { value.ValidatePortStayedReserved = false },
-		"validate upstream":     func(value *demoEvidence) { value.ValidateUpstreamCalls = 1 },
+		"validate connection":   func(value *demoEvidence) { value.ValidateUpstreamConnections = 1 },
+		"validate HTTP request": func(value *demoEvidence) { value.ValidateUpstreamCalls = 1 },
 		"buffered body":         func(value *demoEvidence) { value.BufferedBodyExact = false },
 		"buffered headers":      func(value *demoEvidence) { value.BufferedSafeHeaders = false },
 		"buffered status":       func(value *demoEvidence) { value.BufferedStatus = 500 },
@@ -120,9 +121,9 @@ func TestVisualArtifactsAreDeterministicAccessibleAndSelfContained(t *testing.T)
 
 	architecture := string(first[visualArchitectureName])
 	for _, required := range []string{
-		"PREDISPATCH COUNT SLOTS",
+		"acquire before body read",
 		"count + exact body bytes + estimated work",
-		"count + work only (NO BYTES)",
+		"NO INFLIGHT-BYTE COUNTER",
 		"FUTURE - NOT IMPLEMENTED",
 	} {
 		if !strings.Contains(architecture, required) {
@@ -132,6 +133,7 @@ func TestVisualArtifactsAreDeterministicAccessibleAndSelfContained(t *testing.T)
 	setup := string(first[visualSetupName])
 	for _, required := range []string{
 		"Go 1.26.5",
+		"GOTOOLCHAIN=go1.26.5",
 		"mode 0700",
 		"exact mode 0600",
 		"gateway policy is valid",
@@ -277,6 +279,7 @@ func completeDemoEvidence() demoEvidence {
 		ValidateStdout:                     "gateway policy is valid\n",
 		ValidatePortStayedReserved:         true,
 		ValidateUpstreamCalls:              0,
+		ValidateUpstreamConnections:        0,
 		BufferedStatus:                     200,
 		BufferedProtocolMajor:              1,
 		BufferedBodyExact:                  true,

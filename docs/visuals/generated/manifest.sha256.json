@@ -1,7 +1,7 @@
 {
   "schema": "ssemaphore.readme-visuals.v1",
   "demo": {
-    "command": "go run ./tools/render_readme_visuals",
+    "command": "GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals",
     "scope": "one Linux gateway instance, one tenant, two synthetic numeric-loopback requests",
     "toolchain": "go1.26.5",
     "platform": "linux"
@@ -46,7 +46,7 @@
         "internal/server/listener.go",
         "internal/server/server.go"
       ],
-      "sha256": "b24b690a0f7324da2e73148943a47a120bd68b6ade4f9e7a178d0facd7c7d86c"
+      "sha256": "5346bf03f2872330e53bc3f7b6b90c02bc34a38803ee0a41a4ead4747e4b47dd"
     },
     "generator": {
       "files": [
@@ -56,7 +56,7 @@
         "tools/render_readme_visuals/render.go",
         "tools/render_readme_visuals/setup.go"
       ],
-      "sha256": "444c081ba1287012f2db4fb4d5eaa203500540e2866743c47b611155f5a114cf"
+      "sha256": "93c9a8b2ed3eea46be0635529492c742af0464c23246d93460c46c59e8e78c5c"
     },
     "policy_example": {
       "path": "configs/policy.example.json",
@@ -66,24 +66,24 @@
   },
   "artifacts": {
     "architecture.svg": {
-      "bytes": 18777,
-      "sha256": "e054b63798a31313521d896bfab03ba88b679633c36b87a18763c4b57e5dbbee"
+      "bytes": 19137,
+      "sha256": "360403e280a310fbf1f990c8cc578f7b403612dca6015c54fee425e8ee29c196"
     },
     "loopback-evidence.json": {
-      "bytes": 1174,
-      "sha256": "8bc6972765c3f1460207e97b77211ddf3f3e242714be440db42c23b8fda91c6d"
+      "bytes": 1207,
+      "sha256": "e3eee829323f3524dea463255e32779d10d46bbdca5ccecd3e64c224b27d8ca8"
     },
     "loopback-evidence.txt": {
-      "bytes": 520,
-      "sha256": "f05b1ea53b38654bac4450a24cb50b46da6523f816f81781ca414cf56378bd41"
+      "bytes": 569,
+      "sha256": "a958e66a11c3ed7c021ddd0c3d94f05517bf143f5fe083ccb2b076324d7f077d"
     },
     "loopback-terminal.svg": {
-      "bytes": 2628,
-      "sha256": "e76beb962c8fcf8d562f7418ae5f3097a6b204a5e596ac20374e167fd96f5368"
+      "bytes": 2690,
+      "sha256": "be7675f64e55ec88d3a06f7f689ac81de37f63b16bc55e5924e86fd48d19340e"
     },
     "setup-workflow.svg": {
-      "bytes": 8234,
-      "sha256": "f8bb79da61c4f156ea318cf1590752d024ed2d2f21a2efd40acfa0c1025760ac"
+      "bytes": 8322,
+      "sha256": "fcb66e2ac4fca759951ca88454200dddea93f0442c34f1bb37e72d47e0441b46"
     },
     "stream-sequence.svg": {
       "bytes": 5798,

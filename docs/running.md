@@ -10,7 +10,12 @@ The runnable command currently targets Linux. Its policy loader uses Linux
 `O_NOFOLLOW` and `O_NONBLOCK` file-open guarantees to reject symlinks and
 special files without blocking.
 
+Reproducible builds and committed evidence use exactly Go 1.26.5. Setting
+`GOTOOLCHAIN` explicitly prevents a newer local default toolchain from changing
+the recorded runtime provenance.
+
 ```sh
+export GOTOOLCHAIN=go1.26.5
 mkdir -p bin
 go build -o bin/ssemaphore ./cmd/ssemaphore
 ```

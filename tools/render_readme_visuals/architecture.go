@@ -59,66 +59,68 @@ func renderArchitectureSVG() string {
   <rect x="35" y="329" width="1530" height="354" rx="15" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
   <text x="55" y="363" fill="#0550ae" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700">2. REQUEST ADMISSION AND DISPATCH</text>
 
-  <rect x="55" y="389" width="245" height="238" rx="12" fill="#ddf4ff" stroke="#54aeff" stroke-width="2"/>
-  <text x="177" y="419" fill="#0550ae" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700">BOUNDED HTTP/1</text>
-  <text x="177" y="440" fill="#0550ae" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700">INGRESS</text>
-  <text x="75" y="472" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">numeric-loopback listener</text>
-  <text x="75" y="495" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">connection + header bounds</text>
-  <text x="75" y="518" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">body + message bounds</text>
-  <text x="75" y="541" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">finite read/write deadlines</text>
-  <text x="75" y="564" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">HTTP/2 rejected at handler guard</text>
-  <text x="75" y="587" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">draining rejects new admission</text>
+  <rect x="55" y="389" width="280" height="238" rx="12" fill="#ddf4ff" stroke="#54aeff" stroke-width="2"/>
+  <text x="195" y="416" fill="#0550ae" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700">BOUNDED HTTP/1</text>
+  <text x="195" y="437" fill="#0550ae" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700">LISTENER + HEADER GATE</text>
+  <text x="75" y="466" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">numeric-loopback listener</text>
+  <text x="75" y="488" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">connection + header bounds; deadlines</text>
+  <text x="75" y="510" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">exact path + POST method</text>
+  <text x="75" y="532" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">bearer auth -&gt; immutable tenant</text>
+  <text x="75" y="554" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">media type + queue-timeout header</text>
+  <text x="75" y="576" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">Content-Length precheck</text>
+  <text x="75" y="602" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="11">HTTP/2 rejected; no body read yet</text>
 
-  <path d="M 300 508 L 328 508" fill="none" stroke="#0969da" stroke-width="3" marker-end="url(#architecture-arrow-blue)"/>
+  <path d="M 335 508 L 353 508" fill="none" stroke="#0969da" stroke-width="3" marker-end="url(#architecture-arrow-blue)"/>
 
-  <rect x="330" y="389" width="255" height="238" rx="12" fill="#ffffff" stroke="#54aeff" stroke-width="2"/>
-  <text x="457" y="419" fill="#0550ae" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700">AUTH + CONTRACT</text>
-  <text x="350" y="456" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">tenant bearer selects queue</text>
-  <text x="350" y="479" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">strict Chat Completions JSON</text>
-  <text x="350" y="502" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">retain exact raw body bytes</text>
-  <text x="350" y="525" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">compute bounded work units</text>
-  <text x="350" y="548" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">absolute deadline set before</text>
-  <text x="350" y="568" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">scheduler mailbox acceptance</text>
+  <rect x="355" y="389" width="230" height="238" rx="12" fill="#fff8c5" stroke="#bf8700" stroke-width="2"/>
+  <text x="470" y="416" fill="#7d4e00" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700">PREDISPATCH</text>
+  <text x="470" y="437" fill="#7d4e00" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700">COUNT SLOTS</text>
+  <text x="375" y="474" fill="#7d4e00" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700">nonblocking, count only</text>
+  <text x="375" y="499" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">tenant first, then global</text>
+  <text x="375" y="524" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">acquire before body read</text>
+  <text x="375" y="549" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="11">hold through Scheduler.Acquire</text>
+  <text x="375" y="574" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="11">release when Acquire returns</text>
+  <text x="375" y="601" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="11">no byte or work accounting</text>
 
-  <path d="M 585 508 L 613 508" fill="none" stroke="#0969da" stroke-width="3" marker-end="url(#architecture-arrow-blue)"/>
+  <path d="M 585 508 L 603 508" fill="none" stroke="#0969da" stroke-width="3" marker-end="url(#architecture-arrow-blue)"/>
 
-  <rect x="615" y="389" width="270" height="238" rx="12" fill="#fff8c5" stroke="#bf8700" stroke-width="2"/>
-  <text x="750" y="419" fill="#7d4e00" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700">PREDISPATCH COUNT SLOTS</text>
-  <text x="635" y="454" fill="#7d4e00" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700">nonblocking, count only</text>
-  <text x="635" y="480" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">tenant first, then global</text>
-  <text x="635" y="510" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">acquire before body read</text>
-  <text x="635" y="538" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">hold until scheduler Acquire returns</text>
-  <text x="635" y="570" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">release on that return</text>
-  <text x="635" y="594" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">no byte or work accounting here</text>
+  <rect x="605" y="389" width="285" height="238" rx="12" fill="#ffffff" stroke="#54aeff" stroke-width="2"/>
+  <text x="747" y="419" fill="#0550ae" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700">BOUNDED BODY + RESERVATION</text>
+  <text x="625" y="458" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">bounded body read + timeout</text>
+  <text x="625" y="483" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">strict Chat Completions JSON</text>
+  <text x="625" y="508" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">retain exact raw body bytes</text>
+  <text x="625" y="533" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">body + message/text limits</text>
+  <text x="625" y="558" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">checked reservation work units</text>
+  <text x="625" y="590" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="11">mode + downstream Flush check</text>
 
-  <path d="M 885 508 L 913 508" fill="none" stroke="#8250df" stroke-width="3" marker-end="url(#architecture-arrow-purple)"/>
+  <path d="M 890 508 L 908 508" fill="none" stroke="#8250df" stroke-width="3" marker-end="url(#architecture-arrow-purple)"/>
 
-  <rect x="915" y="389" width="390" height="238" rx="12" fill="#fbefff" stroke="#8250df" stroke-width="2"/>
-  <text x="1110" y="419" fill="#6639ba" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700">CONFIG-ORDER WDRR OWNER</text>
-  <text x="935" y="448" fill="#6639ba" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700">Acquire: tenant, then global queue checks</text>
-  <text x="935" y="469" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">count + exact body bytes + estimated work</text>
-  <text x="935" y="490" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">per-tenant FIFO; config-order visits</text>
-  <text x="935" y="511" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">weight x base quantum; carried bounded deficit</text>
-  <text x="935" y="532" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">empty queue resets deficit</text>
-  <text x="935" y="553" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">funded-head barrier when global work fragments</text>
-  <text x="935" y="578" fill="#6639ba" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700">dispatch: tenant + global inflight fit</text>
-  <text x="935" y="600" fill="#cf222e" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700">count + work only (NO BYTES)</text>
+  <rect x="910" y="389" width="395" height="238" rx="12" fill="#fbefff" stroke="#8250df" stroke-width="2"/>
+  <text x="1107" y="419" fill="#6639ba" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700">Scheduler.Acquire + CONFIG-ORDER WDRR</text>
+  <text x="930" y="448" fill="#6639ba" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700">absolute queue deadline fixed before mailbox</text>
+  <text x="930" y="470" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">tenant, then global queue checks</text>
+  <text x="930" y="492" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">count + exact body bytes + estimated work</text>
+  <text x="930" y="514" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">per-tenant FIFO; config-order weighted visits</text>
+  <text x="930" y="536" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">carried bounded deficit; empty queue resets it</text>
+  <text x="930" y="558" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">funded-head barrier when global work fragments</text>
+  <text x="930" y="582" fill="#6639ba" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700">dispatch: tenant + global inflight count + work</text>
+  <text x="930" y="604" fill="#cf222e" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700">NO INFLIGHT-BYTE COUNTER</text>
 
-  <path d="M 1305 508 L 1333 508" fill="none" stroke="#8250df" stroke-width="3" marker-end="url(#architecture-arrow-purple)"/>
+  <path d="M 1305 508 L 1323 508" fill="none" stroke="#8250df" stroke-width="3" marker-end="url(#architecture-arrow-purple)"/>
 
-  <rect x="1335" y="389" width="210" height="238" rx="12" fill="#dafbe1" stroke="#1a7f37" stroke-width="2"/>
-  <text x="1440" y="419" fill="#1a7f37" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700">PERMIT</text>
-  <text x="1355" y="456" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">created after dispatch</text>
-  <text x="1355" y="479" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">owns cancel context</text>
-  <text x="1355" y="502" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">one upstream attempt</text>
-  <text x="1355" y="533" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">capacity remains charged</text>
-  <text x="1355" y="554" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">until terminal Finish</text>
-  <text x="1355" y="585" fill="#1a7f37" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700">worker becomes sole owner</text>
+  <rect x="1325" y="389" width="220" height="238" rx="12" fill="#dafbe1" stroke="#1a7f37" stroke-width="2"/>
+  <text x="1435" y="419" fill="#1a7f37" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700">PERMIT</text>
+  <text x="1345" y="456" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">created after dispatch</text>
+  <text x="1345" y="479" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">owns cancel context</text>
+  <text x="1345" y="502" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">one upstream attempt</text>
+  <text x="1345" y="533" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">capacity remains charged</text>
+  <text x="1345" y="554" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="12">until terminal Finish</text>
+  <text x="1345" y="585" fill="#1a7f37" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700">worker becomes sole owner</text>
 
   <rect x="35" y="701" width="1530" height="257" rx="15" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
   <text x="55" y="735" fill="#0550ae" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="700">3. UPSTREAM RESPONSE AND EXACT-ONCE TERMINAL ACCOUNTING</text>
 
-  <path d="M 1440 627 L 1440 758" fill="none" stroke="#8250df" stroke-width="3" marker-end="url(#architecture-arrow-purple)"/>
+  <path d="M 1435 627 L 1435 758" fill="none" stroke="#8250df" stroke-width="3" marker-end="url(#architecture-arrow-purple)"/>
 
   <rect x="1200" y="757" width="345" height="173" rx="12" fill="#ddf4ff" stroke="#54aeff" stroke-width="2"/>
   <text x="1372" y="784" fill="#0550ae" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700">FIXED HTTP/1 UPSTREAM POST</text>

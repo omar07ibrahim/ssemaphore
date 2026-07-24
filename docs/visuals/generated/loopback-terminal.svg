@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="390" viewBox="0 0 1200 390" role="img" aria-labelledby="title desc">
-  <title id="title">SSEmaphore verified loopback transcript</title>
-  <desc id="desc">Content-free results from real validate, buffered relay, streaming relay, credential isolation, and SIGTERM shutdown checks.</desc>
+  <title id="title">SSEmaphore verified loopback summary</title>
+  <desc id="desc">Content-free evidence summary derived from real validate, buffered relay, streaming relay, credential isolation, and SIGTERM shutdown checks.</desc>
   <rect width="1200" height="390" rx="17" fill="#0d1117"/>
   <circle cx="31" cy="29" r="7" fill="#ff5f56"/>
   <circle cx="55" cy="29" r="7" fill="#ffbd2e"/>
   <circle cx="79" cy="29" r="7" fill="#27c93f"/>
-  <text x="600" y="36" fill="#8b949e" text-anchor="middle" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="15">verified numeric-loopback evidence</text>
+  <text x="600" y="36" fill="#8b949e" text-anchor="middle" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="15">verified numeric-loopback summary</text>
   <line x1="0" y1="54" x2="1200" y2="54" stroke="#30363d"/>
-  <text x="54" y="90" fill="#7ee787" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">$ go run ./tools/render_readme_visuals</text>
+  <text x="54" y="90" fill="#7ee787" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">verified run: GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals</text>
   <text x="54" y="123" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">validate: gateway policy is valid</text>
-  <text x="54" y="156" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">validate boundary: port stayed reserved; upstream calls 0</text>
+  <text x="54" y="156" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">validate boundary: port reserved; upstream connections 0; HTTP requests 0</text>
   <text x="54" y="189" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">buffered relay: HTTP/1 200; exact validated body; safe headers</text>
   <text x="54" y="222" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">stream relay: chunk-1 -&gt; chunk-2 -&gt; [DONE] -&gt; clean-eof</text>
   <text x="54" y="255" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">stream ordering: first chunk arrived before upstream release</text>

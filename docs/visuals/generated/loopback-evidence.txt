@@ -1,6 +1,6 @@
-$ go run ./tools/render_readme_visuals
+verified run: GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals
 validate: gateway policy is valid
-validate boundary: port stayed reserved; upstream calls 0
+validate boundary: port reserved; upstream connections 0; HTTP requests 0
 buffered relay: HTTP/1 200; exact validated body; safe headers
 stream relay: chunk-1 -> chunk-2 -> [DONE] -> clean-eof
 stream ordering: first chunk arrived before upstream release

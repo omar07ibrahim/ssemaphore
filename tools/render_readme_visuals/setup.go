@@ -22,8 +22,9 @@ func renderSetupWorkflowSVG() string {
   <text x="105" y="146" class="text" font-size="20" font-weight="700">Build on Linux</text>
   <text x="61" y="178" class="muted" font-size="15">Linux toolchain: Go 1.26.5</text>
   <rect x="61" y="193" width="384" height="88" rx="9" fill="#f6f8fa" stroke="#afb8c1"/>
-  <text x="78" y="224" class="code" font-size="14">$ mkdir -p bin</text>
-  <text x="78" y="254" class="code" font-size="13">$ go build -o bin/ssemaphore ./cmd/ssemaphore</text>
+  <text x="78" y="214" class="code" font-size="13">$ export GOTOOLCHAIN=go1.26.5</text>
+  <text x="78" y="239" class="code" font-size="13">$ mkdir -p bin</text>
+  <text x="78" y="264" class="code" font-size="13">$ go build -o bin/ssemaphore ./cmd/ssemaphore</text>
   <text x="61" y="298" class="muted" font-size="13">Produces the repository's single gateway binary.</text>
 
   <rect x="487" y="105" width="426" height="205" rx="14" class="card"/>

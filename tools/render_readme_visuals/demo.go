@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -33,6 +34,7 @@ const (
 	loopbackDemoClientHeaderValue = "synthetic-client-only-metadata"
 	loopbackDemoClientUserAgent   = "ssemaphore-readme-demo-client"
 	loopbackDemoUnsafeHeader      = "X-Ssemaphore-Upstream-Unsafe"
+	loopbackDemoAcceptBarrierPath = "/__ssemaphore_accept_barrier__"
 
 	loopbackDemoBufferedRequest = `{"model":"portfolio-model","messages":[{"role":"user","content":"show the bounded buffered path"}],"max_completion_tokens":8}`
 	loopbackDemoStreamRequest   = `{"model":"portfolio-model","messages":[{"role":"user","content":"show the bounded streaming path"}],"max_completion_tokens":8,"stream":true}`
@@ -52,6 +54,7 @@ type demoEvidence struct {
 	ValidateStdout                     string
 	ValidatePortStayedReserved         bool
 	ValidateUpstreamCalls              int
+	ValidateUpstreamConnections        int
 	BufferedStatus                     int
 	BufferedProtocolMajor              int
 	BufferedBodyExact                  bool
@@ -88,12 +91,30 @@ type loopbackDemoUpstream struct {
 	tenantToken     string
 	upstreamToken   string
 	calls           atomic.Int32
+	acceptBarrier   chan loopbackDemoAcceptBarrier
 	checks          chan loopbackDemoUpstreamCheck
 	chunkOneFlushed chan struct{}
 	streamResult    chan bool
 	releaseStream   chan struct{}
 	releaseOnce     sync.Once
 	released        atomic.Bool
+}
+
+type loopbackDemoAcceptedConnection struct {
+	*net.TCPConn
+	sequence int64
+}
+
+type loopbackDemoCountingListener struct {
+	*net.TCPListener
+	accepted atomic.Int64
+}
+
+type loopbackDemoConnectionSequenceKey struct{}
+
+type loopbackDemoAcceptBarrier struct {
+	sequence int64
+	exact    bool
 }
 
 type loopbackDemoProcessWait struct {
@@ -145,6 +166,7 @@ func runLoopbackDemo(ctx context.Context, root string) (evidence demoEvidence, r
 	var (
 		gatewayReservation *net.TCPListener
 		upstreamListener   *net.TCPListener
+		countingListener   *loopbackDemoCountingListener
 		upstreamServer     *http.Server
 		upstreamWait       chan error
 		upstream           *loopbackDemoUpstream
@@ -249,10 +271,14 @@ func runLoopbackDemo(ctx context.Context, root string) (evidence demoEvidence, r
 		host:            net.JoinHostPort("127.0.0.1", strconv.Itoa(upstreamAddress.Port)),
 		tenantToken:     tenantToken,
 		upstreamToken:   upstreamToken,
+		acceptBarrier:   make(chan loopbackDemoAcceptBarrier, 1),
 		checks:          make(chan loopbackDemoUpstreamCheck, 4),
 		chunkOneFlushed: make(chan struct{}, 1),
 		streamResult:    make(chan bool, 1),
 		releaseStream:   make(chan struct{}),
+	}
+	countingListener = &loopbackDemoCountingListener{
+		TCPListener: upstreamListener,
 	}
 	upstreamProtocols := new(http.Protocols)
 	upstreamProtocols.SetHTTP1(true)
@@ -264,10 +290,11 @@ func runLoopbackDemo(ctx context.Context, root string) (evidence demoEvidence, r
 		IdleTimeout:       5 * time.Second,
 		Protocols:         upstreamProtocols,
 		ErrorLog:          log.New(io.Discard, "", 0),
+		ConnContext:       loopbackDemoConnectionContext,
 	}
 	upstreamWait = make(chan error, 1)
 	go func() {
-		upstreamWait <- upstreamServer.Serve(upstreamListener)
+		upstreamWait <- upstreamServer.Serve(countingListener)
 	}()
 
 	gatewayReservation, err = net.ListenTCP("tcp4", &net.TCPAddr{
@@ -321,8 +348,19 @@ func runLoopbackDemo(ctx context.Context, root string) (evidence demoEvidence, r
 	evidence.GoVersion = runtime.Version()
 	evidence.OperatingSystem = runtime.GOOS
 	evidence.ValidateStdout = validateStdout.String()
+	validateConnections, err := loopbackDemoAcceptedBeforeBarrier(
+		demoContext,
+		upstream.host,
+		countingListener,
+		upstream.acceptBarrier,
+	)
+	if err != nil {
+		return demoEvidence{}, err
+	}
+	evidence.ValidateUpstreamConnections = validateConnections
 	evidence.ValidateUpstreamCalls = int(upstream.calls.Load())
-	if evidence.ValidateUpstreamCalls != 0 {
+	if evidence.ValidateUpstreamCalls != 0 ||
+		evidence.ValidateUpstreamConnections != 0 {
 		return demoEvidence{}, errors.New("loopback demo validation contacted the upstream")
 	}
 	competingListener, competingErr := net.ListenTCP("tcp4", &net.TCPAddr{
@@ -678,6 +716,110 @@ func loopbackDemoTCPAddress(listener *net.TCPListener) (*net.TCPAddr, bool) {
 	return address, true
 }
 
+func (listener *loopbackDemoCountingListener) Accept() (net.Conn, error) {
+	if listener == nil || listener.TCPListener == nil {
+		return nil, net.ErrClosed
+	}
+	connection, err := listener.TCPListener.AcceptTCP()
+	if err != nil {
+		return nil, err
+	}
+	sequence := listener.accepted.Add(1)
+	return &loopbackDemoAcceptedConnection{
+		TCPConn:  connection,
+		sequence: sequence,
+	}, nil
+}
+
+func loopbackDemoConnectionContext(ctx context.Context, connection net.Conn) context.Context {
+	accepted, ok := connection.(*loopbackDemoAcceptedConnection)
+	if !ok || accepted.sequence <= 0 {
+		return ctx
+	}
+	return context.WithValue(
+		ctx,
+		loopbackDemoConnectionSequenceKey{},
+		accepted.sequence,
+	)
+}
+
+func loopbackDemoAcceptedBeforeBarrier(
+	ctx context.Context,
+	address string,
+	listener *loopbackDemoCountingListener,
+	barriers <-chan loopbackDemoAcceptBarrier,
+) (connections int, resultErr error) {
+	if ctx == nil || listener == nil || listener.TCPListener == nil ||
+		barriers == nil {
+		return 0, errors.New("loopback demo accept barrier was not configured")
+	}
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return 0, errors.New("loopback demo accept barrier address was invalid")
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || !ip.Equal(net.IPv4(127, 0, 0, 1)) {
+		return 0, errors.New("loopback demo accept barrier was not numeric loopback")
+	}
+
+	barrierContext, cancelBarrier := context.WithTimeout(ctx, 3*time.Second)
+	defer cancelBarrier()
+	dialer := net.Dialer{}
+	connection, err := dialer.DialContext(barrierContext, "tcp4", address)
+	if err != nil {
+		return 0, errors.New("loopback demo could not connect its accept barrier")
+	}
+	defer func() {
+		if closeErr := connection.Close(); closeErr != nil &&
+			!errors.Is(closeErr, net.ErrClosed) && resultErr == nil {
+			connections = 0
+			resultErr = errors.New("loopback demo could not close its accept barrier")
+		}
+	}()
+	if deadline, ok := barrierContext.Deadline(); ok {
+		if err := connection.SetDeadline(deadline); err != nil {
+			return 0, errors.New("loopback demo could not bound its accept barrier")
+		}
+	}
+
+	request := "GET " + loopbackDemoAcceptBarrierPath +
+		" HTTP/1.1\r\nHost: " + address +
+		"\r\nConnection: close\r\n\r\n"
+	written, err := io.WriteString(connection, request)
+	if err != nil || written != len(request) {
+		return 0, errors.New("loopback demo could not write its accept barrier")
+	}
+	response, err := http.ReadResponse(
+		bufio.NewReader(connection),
+		&http.Request{Method: http.MethodGet},
+	)
+	if err != nil {
+		return 0, errors.New("loopback demo could not read its accept barrier")
+	}
+	body, readErr := io.ReadAll(io.LimitReader(response.Body, 1))
+	closeErr := response.Body.Close()
+	if readErr != nil || closeErr != nil || len(body) != 0 ||
+		response.StatusCode != http.StatusNoContent ||
+		response.ProtoMajor != 1 ||
+		response.ContentLength != 0 ||
+		len(response.TransferEncoding) != 0 {
+		return 0, errors.New("loopback demo accept barrier response was not exact")
+	}
+
+	var barrier loopbackDemoAcceptBarrier
+	select {
+	case barrier = <-barriers:
+	case <-barrierContext.Done():
+		return 0, errors.New("loopback demo accept barrier was not observed")
+	}
+	accepted := listener.accepted.Load()
+	if !barrier.exact || barrier.sequence <= 0 ||
+		accepted != barrier.sequence {
+		return 0, errors.New("loopback demo accept barrier ordering was not exact")
+	}
+	return int(barrier.sequence - 1), nil
+}
+
 func loopbackDemoWaitForCommand(command *exec.Cmd) *loopbackDemoProcessWait {
 	wait := &loopbackDemoProcessWait{done: make(chan struct{})}
 	go func() {
@@ -1009,6 +1151,9 @@ func (upstream *loopbackDemoUpstream) ServeHTTP(
 	writer http.ResponseWriter,
 	request *http.Request,
 ) {
+	if upstream.serveAcceptBarrier(writer, request) {
+		return
+	}
 	call := int(upstream.calls.Add(1))
 	expectedBody := ""
 	expectedAccept := ""
@@ -1082,6 +1227,51 @@ func (upstream *loopbackDemoUpstream) ServeHTTP(
 	default:
 		writer.WriteHeader(http.StatusInternalServerError)
 	}
+}
+
+func (upstream *loopbackDemoUpstream) serveAcceptBarrier(
+	writer http.ResponseWriter,
+	request *http.Request,
+) bool {
+	if request == nil || request.URL == nil ||
+		request.URL.Path != loopbackDemoAcceptBarrierPath {
+		return false
+	}
+	body, readErr := io.ReadAll(io.LimitReader(request.Body, 1))
+	closeErr := request.Body.Close()
+	sequence, sequenceOK := request.Context().Value(
+		loopbackDemoConnectionSequenceKey{},
+	).(int64)
+	exact := sequenceOK &&
+		sequence > 0 &&
+		readErr == nil &&
+		closeErr == nil &&
+		len(body) == 0 &&
+		request.Method == http.MethodGet &&
+		request.URL.RawQuery == "" &&
+		!request.URL.ForceQuery &&
+		request.ProtoMajor == 1 &&
+		request.Host == upstream.host &&
+		request.ContentLength == 0 &&
+		len(request.TransferEncoding) == 0 &&
+		request.Close &&
+		request.Header.Get("Authorization") == "" &&
+		!loopbackDemoHeaderContains(request.Header, upstream.tenantToken) &&
+		!loopbackDemoHeaderContains(request.Header, upstream.upstreamToken)
+	select {
+	case upstream.acceptBarrier <- loopbackDemoAcceptBarrier{
+		sequence: sequence,
+		exact:    exact,
+	}:
+	default:
+		exact = false
+	}
+	if !exact {
+		writer.WriteHeader(http.StatusBadRequest)
+		return true
+	}
+	writer.WriteHeader(http.StatusNoContent)
+	return true
 }
 
 func (upstream *loopbackDemoUpstream) serveStream(

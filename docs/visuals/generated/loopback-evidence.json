@@ -6,7 +6,8 @@
   "validate": {
     "accepted": true,
     "listener_remained_reserved": true,
-    "upstream_connections": 0
+    "upstream_connections": 0,
+    "upstream_http_requests": 0
   },
   "buffered": {
     "status": 200,
