@@ -105,5 +105,11 @@ type schedulerGate struct {
 }
 
 func (g schedulerGate) Acquire(ctx context.Context, request admission.Admission) (workPermit, admission.Decision) {
-	return g.scheduler.Acquire(ctx, request)
+	permit, decision := g.scheduler.Acquire(ctx, request)
+	// A nil *Permit boxed directly as workPermit would become a non-nil
+	// interface and make terminal admission decisions look dispatched.
+	if permit == nil {
+		return nil, decision
+	}
+	return permit, decision
 }
