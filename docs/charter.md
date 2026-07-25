@@ -77,8 +77,11 @@ arithmetic is checked before accounting changes:
 - in-flight requests and in-flight reservation units, globally and per tenant;
 - upstream response bytes, individual SSE event bytes, relay buffer bytes,
   downstream write time, and total request duration;
-- tenant count, metric label values, lifecycle-writer queue depth, and exporter
-  queue depth.
+- configured tenant count.
+
+The planned telemetry milestone adds separate bounds for metric-label values,
+the lifecycle-writer queue, and exporter queues. None of those telemetry or
+persistence surfaces exists in the current executable.
 
 Failed server construction leaves listener ownership with its caller. The
 library neither creates the listener nor bounds its kernel listen backlog.
@@ -105,13 +108,15 @@ validated UTF-8 body is deterministic and makes extra whitespace cost the
 sender that supplied it. The reservation is a scheduling proxy, not a token
 count or a prediction of GPU time.
 
-Actual token usage, when supplied by the upstream, is recorded separately as
-bounded telemetry. It never rewrites a scheduling decision after the fact.
+Actual token usage is not currently recorded. A future bounded telemetry
+surface may record usage supplied by the upstream, but it must never rewrite a
+scheduling decision after the fact.
 
 The queued-body counter measures the exact retained raw JSON bytes, not total
 Go heap usage. Decoded messages are separately bounded by the body envelope,
-message-count limit, and queued-request limit. Published load evidence reports
-RSS instead of presenting the raw-body counter as a memory measurement.
+message-count limit, and queued-request limit. No load or RSS result is
+published yet. Any future load evidence must report process RSS instead of
+presenting the raw-body counter as a memory measurement.
 
 ## Admission and scheduling
 
@@ -137,11 +142,12 @@ Weights and quanta are positive, arithmetic is checked, an empty queue resets
 its deficit, and the configured cap is at least
 `max_request_units - 1 + max_tenant_quantum`.
 
-The fairness claim is deliberately narrow: seeded traces of bounded variable
-request costs must match an independent weighted-DRR oracle, and saturated
-reports compare dispatched reservation-unit ratios with configured weights and
-a published error bound. It is not a claim about real GPU seconds, tokens, or
-end-user latency.
+The implemented fairness check is deliberately narrow: it compares seeded
+traces of bounded variable request costs with an independent weighted-DRR
+oracle. A seeded saturated report comparing dispatched reservation-unit ratios
+with configured weights and a published error bound remains a release
+obligation. Neither the existing tests nor that future report establish
+fairness in real GPU seconds, tokens, or end-user latency.
 
 ## Lifecycle
 
@@ -214,7 +220,7 @@ closes the stream without a synthetic `[DONE]`, and records a content-free
 terminal reason. It never injects a second JSON protocol into an active SSE
 stream.
 
-## Shutdown and restart
+## Shutdown and planned restart reconciliation
 
 `BeginDrain` stops new admission, rejects new requests with `503`, cancels
 queued requests, and leaves dispatched requests a server-configured grace
@@ -232,39 +238,34 @@ contexts. `ForceCancelInflight` completes before HTTP context cancellation, so
 a client-side race cannot replace terminal shutdown attribution. The caller's
 context bounds waiting for the result, not the cleanup itself.
 
-The later lifecycle-journal milestone uses a bounded writer queue and exposes a
-drop counter. It is not tamper-proof or an exactly-once audit log. At startup,
-persisted nonterminal rows are reconciled as `restart_abandoned`; this is a
-recovery outcome, not a live state-machine transition. Restart never replays a
-generation or resurrects a client connection.
+The current executable has no lifecycle journal, journal writer, database, or
+restart reconciliation. A later milestone is constrained to use a bounded
+writer queue with an explicit drop counter and to reconcile persisted
+nonterminal rows as `restart_abandoned` without dispatching them. Those are
+planned design requirements, not current controls or observed results. The
+planned journal is not intended to be tamper-proof or exactly once, and restart
+must never replay a generation or resurrect a client connection.
 
 ## Required evidence
 
-The v0.1 release is gated on all of the following:
+The release status tracks all ten obligations below. Rows 1--9 are v0.1 gates;
+row 10 is an optional compatibility report. **Implemented** means the complete
+obligation has reproducible evidence in the repository; **Partial** means only
+the linked subset exists; **Planned** means no qualifying result has landed. A
+partial mandatory row is not release-complete.
 
-1. strict request-contract tests use an official OpenAI SDK against the
-   documented subset and negative fixtures for every unsupported field;
-2. synchronized bursts distinguish per-tenant exhaustion (`429`) from global
-   request, byte, or work saturation (`503`) with exact expected counts;
-3. property and fuzz tests never exceed queue or in-flight limits, never
-   dispatch expired work, and release every reservation exactly once;
-4. randomized scheduler traces match an independent weighted-DRR oracle, and a
-   seeded saturated two-tenant workload at weights `1:3` reports its bounded
-   reservation-unit allocation error;
-5. a queued-cancellation storm creates zero upstream attempts; one thousand
-   in-flight disconnects are observed by the deterministic upstream within one
-   second, followed by zero active requests after drain;
-6. race-enabled tests pass and goroutine counts return to a documented bounded
-   tolerance after fault scenarios;
-7. restart tests reconcile interrupted journal rows without dispatching them;
-8. canary prompt text and credentials are absent from logs, spans, metric
-   labels, and the lifecycle database, whose event type cannot represent raw
-   headers, bodies, or free-form errors;
-9. a ten-minute published load scenario includes bursts, slow readers,
-   upstream hangs, truncated SSE, `500`, and cancellation, with its seed,
-   configuration, commit, host facts, and raw result data;
-10. an optional pinned llama.cpp CPU-server report demonstrates wire
-    compatibility without making throughput or GPU claims.
+| # | Status | Release obligation and current evidence |
+| ---: | --- | --- |
+| 1 | **Partial** | Strict request parsing and negative contract cases exist in the [request tests](../internal/contract/request_test.go) and [API contract](api.md); no test currently uses an official OpenAI SDK. |
+| 2 | **Partial** | [Scheduler limit tests](../internal/admission/scheduler_test.go) distinguish tenant/global count, byte, and work decisions, and [handler tests](../internal/httpapi/handler_test.go) verify their HTTP mapping; the synchronized-burst report with exact aggregate counts is not implemented. |
+| 3 | **Partial** | Parser/SSE fuzzing plus cancellation, expiry, and exact-release tests cover important invariants in [contract tests](../internal/contract) and [admission tests](../internal/admission); there is no property suite proving the full queue and in-flight obligation. |
+| 4 | **Partial** | The [scheduler tests](../internal/admission/scheduler_test.go) compare randomized traces with an independent weighted-DRR oracle; no published saturated `1:3` allocation report or error bound exists. |
+| 5 | **Partial** | Current [handler](../internal/httpapi) and [server](../internal/server) tests cover queued/in-flight cancellation and drain, while the [loopback evidence](visuals/generated/loopback-evidence.json) covers one in-flight stream; the specified storm and one-thousand-disconnect result do not exist. |
+| 6 | **Partial** | A race-enabled lane is configured in [CI](../.github/workflows/ci.yml); no committed run receipt or bounded goroutine-return measurement covers the full obligation. |
+| 7 | **Planned** | No lifecycle journal, database, or restart-reconciliation code exists, so interrupted-row recovery has no test evidence. |
+| 8 | **Partial** | Canary and redaction tests cover current static errors, credentials, and generated evidence in [application tests](../internal/app) and [visual tests](../tools/render_readme_visuals/render_test.go); spans, metric labels, exporter queues, and a lifecycle database do not exist and therefore have no canary result. |
+| 9 | **Planned** | No ten-minute load run, RSS report, seed, host-fact record, or raw load dataset is published. |
+| 10 | **Planned** | No pinned llama.cpp CPU-server compatibility report is published; this obligation remains optional and cannot support a current compatibility claim. |
 
 ## Non-goals
 

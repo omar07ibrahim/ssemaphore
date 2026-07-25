@@ -18,7 +18,7 @@ inference upstream.
 - configured tenant and upstream credentials;
 - tenant isolation and the integrity of scheduler weights and limits;
 - prompt and completion confidentiality;
-- lifecycle and telemetry integrity;
+- integrity of any future lifecycle journal and telemetry surfaces;
 - the rule that one accepted request produces at most one upstream attempt.
 
 ## Trust boundaries
@@ -33,8 +33,8 @@ SSEmaphore process
 untrusted-or-faulty inference upstream
 
 operator configuration -> trusted input at process start
-lifecycle database     -> local persistent state, not a content store
-telemetry exporter     -> separate sink with bounded attributes
+planned lifecycle database -> future local state, not a content store
+planned telemetry exporter -> future sink with bounded attributes
 ```
 
 An authenticated tenant is still adversarial. Tenant identity comes only from
@@ -44,7 +44,7 @@ respect body sizes, SSE framing, response time, header hygiene, or usage
 accounting. A local operator can misconfigure limits; the process must reject
 invalid or internally inconsistent configuration before listening.
 
-## Threats and target controls
+## Threats and current or planned controls
 
 ### Resource exhaustion at ingress
 
@@ -69,13 +69,15 @@ One tenant may fill global capacity, split work into many small requests, send
 one request larger than a scheduler quantum, or exploit nondeterministic map
 order.
 
-Controls: global and per-tenant request, body-byte, and reservation limits;
-FIFO order inside a tenant; stable tenant ordering; carried DRR deficit;
-positive bounded weights; checked cost and deficit arithmetic; deficit reset
-for an empty queue; and a funded-head barrier when global work is fragmented.
-Adversarial tests verify that later small requests cannot indefinitely bypass a
-large funded head, and an independent oracle checks randomized traces. Fairness
-is stated only in bounded estimated-service units, never inferred GPU cost.
+Implemented controls: global and per-tenant request, body-byte, and reservation
+limits; FIFO order inside a tenant; stable tenant ordering; carried DRR
+deficit; positive bounded weights; checked cost and deficit arithmetic;
+deficit reset for an empty queue; and a funded-head barrier when global work is
+fragmented. Adversarial tests verify that later small requests cannot
+indefinitely bypass a large funded head, and an independent oracle checks
+randomized traces. No saturated weighted-service report is published.
+Fairness is stated only in bounded estimated-service units, never inferred GPU
+cost.
 
 ### Credential confusion and SSRF
 
@@ -145,60 +147,72 @@ is made about GPU resource reclamation after HTTP cancellation.
 An automatic retry can duplicate expensive work, and a gateway cannot replace
 an HTTP status after the first response byte.
 
-Controls: v0.1 attempts the upstream exactly once. The concrete transport is
-HTTP/1-only and sends a non-replayable POST body with no `GetBody` function, so
-Go cannot retry it after a stale connection or protocol failure. Redirects are
-also disabled. State records whether the response was committed. Before
-commitment, failures use the documented JSON envelope; after commitment,
-upstream is canceled and the connection closes without a synthetic `[DONE]`;
-only a private terminal reason is recorded.
+Implemented controls: v0.1 attempts the upstream exactly once. The concrete
+transport is HTTP/1-only and sends a non-replayable POST body with no `GetBody`
+function, so Go cannot retry it after a stale connection or protocol failure.
+Redirects are also disabled. State records whether the response was committed.
+Before commitment, failures use the documented JSON envelope; after
+commitment, upstream is canceled and the connection closes without a synthetic
+`[DONE]`; only a private terminal reason is recorded.
 
 ### Content and credential leakage
 
-Prompts, completions, authorization headers, or API keys may leak through logs,
-span attributes, metric labels, error messages, request hashes, or the journal.
+Prompts, completions, authorization headers, or API keys may leak through
+current errors and generated evidence or through future logs, spans, metric
+labels, request hashes, exporter queues, and journal records.
 
-Controls: none of those surfaces record bodies or credentials. The lifecycle
-event is a closed type containing fixed-size request and tenant identifiers,
-numeric policy revision, bounded unit counts, timestamps, and terminal enums;
-it cannot hold arbitrary strings, maps, headers, bodies, or raw errors. It
-stores no body hash because low-entropy prompts can be guessed. Metric labels
-use fixed bounded enums and never model, tenant, or request IDs. Export queues
-are bounded and expose dropped-event counters. Telemetry tests inject canary
-secrets and scan every sink.
+Implemented controls: current CLI and HTTP failures use fixed messages,
+upstream and policy values redact credentials when formatted, the inbound
+server discards its internal error log, and generated evidence passes a
+content and credential publication gate. Existing canary tests cover those
+current surfaces. The executable has no telemetry exporter, spans, metric
+labels, lifecycle journal, or lifecycle database; their absence is not evidence
+that future implementations are safe.
+
+Planned controls: a closed lifecycle event may contain only bounded identifiers,
+numeric policy values, bounded unit counts, timestamps, and terminal enums,
+never arbitrary strings, maps, headers, bodies, raw errors, or body hashes.
+Metric labels must use fixed bounded enums; lifecycle-writer and exporter
+queues must be bounded and expose drop counters. Canary prompt and credential
+tests must scan every new sink before any telemetry or persistence claim
+becomes current.
 
 ### Journal corruption and restart ambiguity
 
-A crash may leave reservations marked in flight, while a damaged database may
-produce inconsistent recovery decisions.
+A future crash-aware journal could leave reservations marked in flight, while a
+damaged database could produce inconsistent recovery decisions. No journal,
+lifecycle writer, SQLite database, or restart reconciliation is implemented
+today.
 
-Controls: a bounded lifecycle-writer queue with an explicit dropped counter;
-schema and policy versions; SQLite transactions; integrity checks at startup;
-fail-closed recovery; and an idempotent reconciliation that marks nonterminal
-rows abandoned without replay. The journal is best-effort, not tamper-proof or
-exactly once, and crash-tail loss remains possible. WAL mode is permitted only
-with a SQLite version that contains the 2026 WAL-reset corruption fix or an
-applicable backport, and the deployment keeps the database, WAL, and
-shared-memory files on one local filesystem.
+Planned controls: a bounded lifecycle-writer queue with an explicit drop
+counter; schema and policy versions; SQLite transactions; startup integrity
+checks; fail-closed recovery; and idempotent reconciliation that marks
+nonterminal rows abandoned without replay. The planned journal remains
+best-effort rather than tamper-proof or exactly once, and crash-tail loss
+remains possible. Any future WAL deployment must use a SQLite version
+containing the relevant WAL-reset corruption fix or an applicable backport and
+must keep the database, WAL, and shared-memory files on one local filesystem.
 
 ### Shutdown races
 
 New admission during drain could create work that outlives the grace period,
 while queued or active work could retain capacity after cancellation.
 
-Controls: one idempotent server-owned cleanup drains admission and the HTTP
-listener on an independent grace deadline. If that phase fails or expires, it
-seals new inner handler work, commits `ForceCancelInflight` before canceling
-HTTP contexts, closes connections, and waits on both tracked handlers and
-scheduler accounting under a separate force deadline. A caller context bounds
-only that caller's wait and cannot abort cleanup. The handler and server must
-own the same scheduler instance. Tests prove terminal `shutdown` attribution,
-exact result counters, concurrent-caller identity, and zero scheduler counters
-before owner close; uncooperative work yields static `ErrShutdownIncomplete`.
+Implemented controls: one idempotent server-owned cleanup drains admission and
+the HTTP listener on an independent grace deadline. If that phase fails or
+expires, it seals new inner handler work, commits `ForceCancelInflight` before
+canceling HTTP contexts, closes connections, and waits on both tracked handlers
+and scheduler accounting under a separate force deadline. A caller context
+bounds only that caller's wait and cannot abort cleanup. The handler and server
+must own the same scheduler instance. Tests prove terminal `shutdown`
+attribution, exact result counters, concurrent-caller identity, and zero
+scheduler counters before owner close; uncooperative work yields static
+`ErrShutdownIncomplete`.
 
 ## Explicitly unmitigated in v0.1
 
-- compromise of the host, operator account, front proxy, or telemetry backend;
+- compromise of the host, operator account, front proxy, or any future
+  telemetry backend;
 - malicious model output beyond transport and size validation;
 - provider-side retention or logging;
 - denial of service that exhausts bandwidth before the trusted edge;
