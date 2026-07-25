@@ -159,6 +159,22 @@ setup diagrams. The manifest binds production sources, generator sources, the
 example policy, runbook, and published artifacts with SHA-256. These digests
 support deterministic review; they are not signatures or attestations.
 
+Renderer-managed source reads and artifact-output traversal are confined with
+Go's `os.Root`; every managed component must be a real directory or regular
+file, and scans and reads have explicit entry and byte limits. On the Linux
+evidence path, nonblocking leaf opens also make a concurrent regular-file-to-FIFO
+swap fail instead of stalling the renderer. Writes use a mode-`0644` temporary
+file, `fsync`, atomic rename, and directory `fsync`; newly created output
+directories are persisted through their parent before use, and the manifest is
+written last. The bundle is deliberately **not transactional**: an interrupted
+or failed run can leave a mixture of old and new non-manifest files. Until the
+final manifest rename, the prior manifest remains (or no manifest exists), so
+`--check` reports that partial bundle as stale. A failure reported after the
+manifest rename, such as a final directory-`fsync` failure, can leave the new
+manifest visible. Honor the failed command: rerun the generator without
+`--check` so it rewrites and re-syncs the bundle, then run `--check`. A passing
+read-only check by itself does not restore or prove crash durability.
+
 Runtime loopback evidence deliberately contains no ports, endpoints, host
 paths, environment-variable names, request IDs, raw headers or bodies,
 timestamps, durations, credential values, or secret-derived hashes. The static

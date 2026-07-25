@@ -54,9 +54,12 @@
         "tools/render_readme_visuals/demo.go",
         "tools/render_readme_visuals/main.go",
         "tools/render_readme_visuals/render.go",
-        "tools/render_readme_visuals/setup.go"
+        "tools/render_readme_visuals/setup.go",
+        "tools/render_readme_visuals/visualfs.go",
+        "tools/render_readme_visuals/visualfs_open_linux.go",
+        "tools/render_readme_visuals/visualfs_open_other.go"
       ],
-      "sha256": "93c9a8b2ed3eea46be0635529492c742af0464c23246d93460c46c59e8e78c5c"
+      "sha256": "f498b6d4c93fae36ae8d4d9c8e57e89f479077aa8ea0efbfd7968f3499c62b34"
     },
     "policy_example": {
       "path": "configs/policy.example.json",

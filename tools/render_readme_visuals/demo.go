@@ -594,18 +594,26 @@ func loopbackDemoWritePolicy(
 	gatewayPort int,
 	upstreamEndpoint string,
 ) error {
-	source, err := os.Open(filepath.Join(root, "configs", "policy.example.json"))
+	repository, err := openPinnedVisualDirectory(root, false)
 	if err != nil {
+		return errors.New("loopback demo could not open the repository")
+	}
+	payload, _, readErr := readBoundedVisualFile(
+		repository,
+		"configs/policy.example.json",
+		visualMaxSourceFileBytes,
+	)
+	closeErr := repository.Close()
+	if readErr != nil || closeErr != nil {
 		return errors.New("loopback demo could not read the policy example")
 	}
-	decoder := json.NewDecoder(source)
+	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
 	document := make(map[string]any)
 	decodeErr := decoder.Decode(&document)
 	var trailing any
 	trailingErr := decoder.Decode(&trailing)
-	closeErr := source.Close()
-	if decodeErr != nil || !errors.Is(trailingErr, io.EOF) || closeErr != nil {
+	if decodeErr != nil || !errors.Is(trailingErr, io.EOF) {
 		return errors.New("loopback demo policy example was not one JSON document")
 	}
 

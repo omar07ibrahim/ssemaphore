@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -124,8 +123,17 @@ func visualRepositoryRoot() (string, error) {
 	if err != nil {
 		return "", errors.New("resolve repository root")
 	}
-	module, err := os.ReadFile(filepath.Join(root, "go.mod"))
-	if err != nil || !strings.HasPrefix(
+	repository, err := openPinnedVisualDirectory(root, false)
+	if err != nil {
+		return "", errors.New("open repository root")
+	}
+	module, _, readErr := readBoundedVisualFile(
+		repository,
+		"go.mod",
+		visualMaxSourceFileBytes,
+	)
+	closeErr := repository.Close()
+	if readErr != nil || closeErr != nil || !strings.HasPrefix(
 		string(module),
 		"module github.com/omar07ibrahim/ssemaphore\n",
 	) {
@@ -135,46 +143,46 @@ func visualRepositoryRoot() (string, error) {
 }
 
 func checkVisualArtifacts(output string, artifacts map[string][]byte) ([]string, error) {
-	stale := make([]string, 0)
-	for _, name := range sortedArtifactNames(artifacts) {
-		current, err := os.ReadFile(filepath.Join(output, name))
-		switch {
-		case errors.Is(err, os.ErrNotExist):
-			stale = append(stale, name)
-		case err != nil:
-			return nil, errors.New("read managed artifact")
-		case !bytes.Equal(current, artifacts[name]):
-			stale = append(stale, name)
-		}
+	if err := validateVisualArtifactSet(artifacts); err != nil {
+		return nil, err
 	}
-
-	entries, err := os.ReadDir(output)
+	directory, err := openPinnedVisualDirectory(output, false)
 	if errors.Is(err, os.ErrNotExist) {
-		return stale, nil
+		return sortedArtifactNames(artifacts), nil
 	}
 	if err != nil {
-		return nil, errors.New("read artifact directory")
+		return nil, errors.New("open artifact directory")
 	}
-	for _, entry := range entries {
-		if _, managed := artifacts[entry.Name()]; !managed {
-			stale = append(stale, "unexpected:"+entry.Name())
-		}
+	stale, checkErr := checkVisualArtifactsInRoot(directory, artifacts)
+	closeErr := directory.Close()
+	if checkErr != nil {
+		return nil, checkErr
 	}
-	sort.Strings(stale)
+	if closeErr != nil {
+		return nil, errors.New("close artifact directory")
+	}
 	return stale, nil
 }
 
 func writeVisualArtifacts(output string, artifacts map[string][]byte) error {
-	if _, ok := artifacts[visualManifestName]; !ok {
-		return errors.New("artifact set has no manifest")
+	if err := validateVisualArtifactSet(artifacts); err != nil {
+		return err
 	}
-	if err := os.MkdirAll(output, 0o755); err != nil {
+	directory, err := openPinnedVisualDirectory(output, true)
+	if err != nil {
 		return errors.New("create artifact directory")
 	}
-	for _, name := range visualWriteOrder(artifacts) {
-		if err := atomicWriteVisual(filepath.Join(output, name), artifacts[name]); err != nil {
-			return err
-		}
+	if err := validateVisualOutputInventory(directory, artifacts); err != nil {
+		_ = directory.Close()
+		return err
+	}
+	writeErr := writeVisualArtifactBundle(directory, artifacts, atomicWriteVisual)
+	closeErr := directory.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	if closeErr != nil {
+		return errors.New("close artifact directory")
 	}
 	return nil
 }
@@ -216,49 +224,4 @@ func visualStaleSummary(stale []string) string {
 		safe = append(safe, "unexpected entry")
 	}
 	return strings.Join(safe, ", ")
-}
-
-func atomicWriteVisual(path string, payload []byte) error {
-	directory := filepath.Dir(path)
-	file, err := os.CreateTemp(directory, "."+filepath.Base(path)+".*")
-	if err != nil {
-		return errors.New("create temporary artifact")
-	}
-	temporary := file.Name()
-	remove := true
-	defer func() {
-		if remove {
-			_ = os.Remove(temporary)
-		}
-	}()
-
-	if err := file.Chmod(0o644); err != nil {
-		_ = file.Close()
-		return errors.New("set artifact mode")
-	}
-	if _, err := file.Write(payload); err != nil {
-		_ = file.Close()
-		return errors.New("write artifact")
-	}
-	if err := file.Sync(); err != nil {
-		_ = file.Close()
-		return errors.New("sync artifact")
-	}
-	if err := file.Close(); err != nil {
-		return errors.New("close artifact")
-	}
-	if err := os.Rename(temporary, path); err != nil {
-		return errors.New("replace artifact")
-	}
-	remove = false
-
-	directoryHandle, err := os.Open(directory)
-	if err != nil {
-		return errors.New("open artifact directory")
-	}
-	defer directoryHandle.Close()
-	if err := directoryHandle.Sync(); err != nil {
-		return errors.New("sync artifact directory")
-	}
-	return nil
 }

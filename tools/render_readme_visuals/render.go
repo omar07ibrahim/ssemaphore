@@ -7,9 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -227,8 +225,17 @@ func buildVisualArtifacts(root string, evidence demoEvidence) (map[string][]byte
 		return nil, err
 	}
 	policyPath := "configs/policy.example.json"
-	policyBytes, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(policyPath)))
+	repository, err := openPinnedVisualDirectory(root, false)
 	if err != nil {
+		return nil, errors.New("open repository for policy digest")
+	}
+	policyBytes, _, readErr := readBoundedVisualFile(
+		repository,
+		policyPath,
+		visualMaxSourceFileBytes,
+	)
+	closeErr := repository.Close()
+	if readErr != nil || closeErr != nil {
 		return nil, errors.New("read policy example")
 	}
 
@@ -494,52 +501,90 @@ func digestVisualSources(
 	directories []string,
 	includeTests bool,
 ) (visualSourceDigest, error) {
-	selected := make(map[string]struct{})
+	repository, err := openPinnedVisualDirectory(root, false)
+	if err != nil {
+		return visualSourceDigest{}, errors.New("open source root")
+	}
+	result, digestErr := digestVisualSourcesInRoot(
+		repository,
+		files,
+		directories,
+		includeTests,
+	)
+	closeErr := repository.Close()
+	if digestErr != nil {
+		return visualSourceDigest{}, digestErr
+	}
+	if closeErr != nil {
+		return visualSourceDigest{}, errors.New("close source root")
+	}
+	return result, nil
+}
+
+func digestVisualSourcesInRoot(
+	root *os.Root,
+	files []string,
+	directories []string,
+	includeTests bool,
+) (visualSourceDigest, error) {
+	if len(files) > visualMaxSourceEntries ||
+		len(directories) > visualMaxSourceEntries ||
+		len(files) > visualMaxSourceEntries-len(directories) {
+		return visualSourceDigest{}, errors.New("source request exceeds entry bound")
+	}
+	selection := visualSourceSelection{
+		files: make(map[string]struct{}),
+	}
 	for _, name := range files {
-		selected[filepath.ToSlash(name)] = struct{}{}
+		canonical, err := canonicalVisualRelativePath(name, false)
+		if err != nil {
+			return visualSourceDigest{}, errors.New("invalid source file path")
+		}
+		if _, exists := selection.files[canonical]; !exists &&
+			len(selection.files) == visualMaxSourceEntries {
+			return visualSourceDigest{}, errors.New("source set exceeds entry bound")
+		}
+		selection.files[canonical] = struct{}{}
 	}
 	for _, directory := range directories {
-		base := filepath.Join(root, filepath.FromSlash(directory))
-		err := filepath.WalkDir(base, func(path string, entry fs.DirEntry, walkErr error) error {
-			if walkErr != nil {
-				return errors.New("walk source directory")
-			}
-			if entry.Type()&os.ModeSymlink != 0 {
-				return errors.New("source tree contains a symlink")
-			}
-			if entry.IsDir() || filepath.Ext(entry.Name()) != ".go" {
-				return nil
-			}
-			if !includeTests && strings.HasSuffix(entry.Name(), "_test.go") {
-				return nil
-			}
-			relative, err := filepath.Rel(root, path)
-			if err != nil {
-				return errors.New("relativize source path")
-			}
-			selected[filepath.ToSlash(relative)] = struct{}{}
-			return nil
-		})
+		canonical, err := canonicalVisualRelativePath(directory, true)
 		if err != nil {
+			return visualSourceDigest{}, errors.New("invalid source directory path")
+		}
+		if err := collectVisualSourceDirectory(
+			root,
+			canonical,
+			includeTests,
+			0,
+			&selection,
+		); err != nil {
 			return visualSourceDigest{}, err
 		}
 	}
+	if len(selection.files) > visualMaxSourceEntries {
+		return visualSourceDigest{}, errors.New("source set exceeds entry bound")
+	}
 
-	names := make([]string, 0, len(selected))
-	for name := range selected {
+	names := make([]string, 0, len(selection.files))
+	for name := range selection.files {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	digest := sha256.New()
+	var totalBytes int64
 	for _, name := range names {
-		info, err := os.Lstat(filepath.Join(root, filepath.FromSlash(name)))
-		if err != nil || !info.Mode().IsRegular() {
-			return visualSourceDigest{}, errors.New("source input is not a regular file")
-		}
-		payload, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		payload, _, err := readBoundedVisualFile(
+			root,
+			name,
+			visualMaxSourceFileBytes,
+		)
 		if err != nil {
 			return visualSourceDigest{}, errors.New("read source input")
 		}
+		if int64(len(payload)) > visualMaxSourceTotalBytes-totalBytes {
+			return visualSourceDigest{}, errors.New("source set exceeds byte bound")
+		}
+		totalBytes += int64(len(payload))
 		_, _ = digest.Write([]byte(name))
 		_, _ = digest.Write([]byte{0})
 		_, _ = digest.Write(payload)
