@@ -75,9 +75,11 @@ deficit; positive bounded weights; checked cost and deficit arithmetic;
 deficit reset for an empty queue; and a funded-head barrier when global work is
 fragmented. Adversarial tests verify that later small requests cannot
 indefinitely bypass a large funded head, and an independent oracle checks
-randomized traces. No saturated weighted-service report is published.
-Fairness is stated only in bounded estimated-service units, never inferred GPU
-cost.
+randomized traces. One [fixed-seed saturation trace](visuals/generated/saturation-dispatch.svg)
+publishes a 20/20 dispatch-order oracle match, but it is not a configured-weight
+allocation or service-share result; no multi-seed ratio report or error bound
+is published. Fairness is stated only in bounded estimated-service units,
+never inferred GPU cost.
 
 ### Credential confusion and SSRF
 

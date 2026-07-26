@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="720" viewBox="0 0 1400 720" role="img" aria-labelledby="title desc">
+  <title id="title">SSEmaphore fixed-seed dispatch trace</title>
+  <desc id="desc">Twenty observed weighted deficit round-robin dispatches plotted by estimated work units and tenant, with independent oracle points coincident at every position. Two SSE requests are outlined.</desc>
+  <rect width="1400" height="720" rx="18" fill="#f6f8fa"/>
+  <text x="54" y="55" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="28" font-weight="700">Seeded WDRR dispatch trace - expected equals observed</text>
+  <text x="54" y="84" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="16">20 production-path service dispatches; bar height is the bounded scheduling estimate in work units.</text>
+
+  <rect x="54" y="105" width="18" height="18" rx="4" fill="#0969da"/>
+  <text x="82" y="120" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="14">tenant-a - weight 1</text>
+  <rect x="250" y="105" width="18" height="18" rx="4" fill="#8250df"/>
+  <text x="278" y="120" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="14">tenant-b - weight 3</text>
+  <rect x="446" y="103" width="22" height="22" rx="4" fill="none" stroke="#bf8700" stroke-width="4"/>
+  <text x="480" y="120" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="14">SSE request</text>
+  <circle cx="628" cy="114" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="642" y="120" fill="#24292f" font-family="DejaVu Sans, Arial, sans-serif" font-size="14">independent oracle point - coincident on all 20</text>
+  <rect x="1070" y="96" width="276" height="38" rx="12" fill="#dafbe1" stroke="#2da44e"/>
+  <text x="1208" y="120" text-anchor="middle" fill="#116329" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700">ORACLE MATCH 20 / 20</text>
+
+  <line x1="88" y1="535" x2="1332" y2="535" stroke="#57606a" stroke-width="2"/>
+  <line x1="88" y1="375" x2="1332" y2="375" stroke="#d0d7de" stroke-dasharray="5 6"/>
+  <line x1="88" y1="215" x2="1332" y2="215" stroke="#d0d7de" stroke-dasharray="5 6"/>
+  <text x="76" y="540" text-anchor="end" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="13">0</text>
+  <text x="76" y="380" text-anchor="end" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="13">80</text>
+  <text x="76" y="220" text-anchor="end" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="13">160</text>
+  <text x="29" y="360" transform="rotate(-90 29 360)" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="14">estimated work units</text>
+  <rect x="100" y="315" width="36" height="220" rx="5" fill="#0969da" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="118" cy="315" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="118" y="305" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">110</text>
+  <text x="118" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">1</text>
+  <rect x="162" y="323" width="36" height="212" rx="5" fill="#8250df" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="180" cy="323" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="180" y="313" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">106</text>
+  <text x="180" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">2</text>
+  <rect x="224" y="213" width="36" height="322" rx="5" fill="#8250df" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="242" cy="213" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="242" y="203" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">161</text>
+  <text x="242" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">3</text>
+  <rect x="286" y="261" width="36" height="274" rx="5" fill="#8250df" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="304" cy="261" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="304" y="251" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">137</text>
+  <text x="304" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">4</text>
+  <rect x="348" y="267" width="36" height="268" rx="5" fill="#8250df" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="366" cy="267" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="366" y="257" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">134</text>
+  <text x="366" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">5</text>
+  <rect x="410" y="301" width="36" height="234" rx="5" fill="#8250df" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="428" cy="301" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="428" y="291" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">117</text>
+  <text x="428" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">6</text>
+  <rect x="472" y="231" width="36" height="304" rx="5" fill="#0969da" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="490" cy="231" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="490" y="221" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">152</text>
+  <text x="490" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">7</text>
+  <rect x="534" y="293" width="36" height="242" rx="5" fill="#0969da" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="552" cy="293" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="552" y="283" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">121</text>
+  <text x="552" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">8</text>
+  <rect x="596" y="219" width="36" height="316" rx="5" fill="#8250df" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="614" cy="219" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="614" y="209" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">158</text>
+  <text x="614" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">9</text>
+  <rect x="658" y="269" width="36" height="266" rx="5" fill="#8250df" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="676" cy="269" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="676" y="259" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">133</text>
+  <text x="676" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">10</text>
+  <rect x="720" y="285" width="36" height="250" rx="5" fill="#8250df" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="738" cy="285" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="738" y="275" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">125</text>
+  <text x="738" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">11</text>
+  <rect x="782" y="297" width="36" height="238" rx="5" fill="#8250df" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="800" cy="297" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="800" y="287" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">119</text>
+  <text x="800" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">12</text>
+  <rect x="844" y="253" width="36" height="282" rx="5" fill="#8250df" stroke="#bf8700" stroke-width="4"/>
+  <circle cx="862" cy="253" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="862" y="243" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">141</text>
+  <text x="862" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">13</text>
+  <rect x="906" y="215" width="36" height="320" rx="5" fill="#0969da" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="924" cy="215" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="924" y="205" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">160</text>
+  <text x="924" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">14</text>
+  <rect x="968" y="239" width="36" height="296" rx="5" fill="#0969da" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="986" cy="239" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="986" y="229" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">148</text>
+  <text x="986" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">15</text>
+  <rect x="1030" y="259" width="36" height="276" rx="5" fill="#0969da" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="1048" cy="259" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="1048" y="249" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">138</text>
+  <text x="1048" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">16</text>
+  <rect x="1092" y="217" width="36" height="318" rx="5" fill="#0969da" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="1110" cy="217" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="1110" y="207" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">159</text>
+  <text x="1110" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">17</text>
+  <rect x="1154" y="235" width="36" height="300" rx="5" fill="#0969da" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="1172" cy="235" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="1172" y="225" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">150</text>
+  <text x="1172" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">18</text>
+  <rect x="1216" y="307" width="36" height="228" rx="5" fill="#0969da" stroke="#ffffff" stroke-width="1"/>
+  <circle cx="1234" cy="307" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="1234" y="297" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">114</text>
+  <text x="1234" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">19</text>
+  <rect x="1278" y="263" width="36" height="272" rx="5" fill="#0969da" stroke="#bf8700" stroke-width="4"/>
+  <circle cx="1296" cy="263" r="4" fill="#ffffff" stroke="#24292f"/>
+  <text x="1296" y="253" text-anchor="middle" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="12">136</text>
+  <text x="1296" y="561" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans Mono, monospace" font-size="12">20</text>
+
+  <text x="710" y="589" text-anchor="middle" fill="#57606a" font-family="DejaVu Sans, Arial, sans-serif" font-size="14">observed dispatch position</text>
+  <rect x="54" y="620" width="1292" height="58" rx="12" fill="#fff8c5" stroke="#d4a72c"/>
+  <text x="700" y="655" text-anchor="middle" fill="#633c01" font-family="DejaVu Sans, Arial, sans-serif" font-size="15">Weights are inputs. This finite trace is not a 3:1 allocation, fairness score, throughput, or latency result.</text>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="470" viewBox="0 0 1400 470" role="img" aria-labelledby="title desc">
+  <title id="title">SSEmaphore bounded saturation evidence</title>
+  <desc id="desc">A terminal summary derived from one real fixed-seed production-path saturation run. It reports categorical accounting, capacity probes, oracle agreement, and explicit non-performance boundaries.</desc>
+  <rect width="1400" height="470" rx="18" fill="#0d1117"/>
+  <circle cx="31" cy="29" r="7" fill="#ff5f56"/>
+  <circle cx="55" cy="29" r="7" fill="#ffbd2e"/>
+  <circle cx="79" cy="29" r="7" fill="#27c93f"/>
+  <text x="700" y="36" fill="#8b949e" text-anchor="middle" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="15">verified saturation projection without measured diagnostic intervals</text>
+  <line x1="0" y1="54" x2="1400" y2="54" stroke="#30363d"/>
+  <text x="48" y="86" fill="#7ee787" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14">reproduce: GOTOOLCHAIN=go1.26.5 go run ./tools/run_saturation --profile=ci --seed=20260725</text>
+  <text x="48" y="122" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14">scope: one bounded synthetic numeric-loopback request-count saturation run</text>
+  <text x="48" y="158" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14">accounting: 28 jobs = 26 service + 1 control + 1 global probe; reconciled</text>
+  <text x="48" y="194" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14">service: 24 admitted -&gt; 20 completed + 2 canceled + 2 queue deadline; 2 rejected</text>
+  <text x="48" y="230" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14">tenant capacity: 2 x HTTP 429; upstream requests 0</text>
+  <text x="48" y="266" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14">global capacity: 1 x HTTP 503; upstream requests 0</text>
+  <text x="48" y="302" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14">dispatch: 20 observed == 20 independent WDRR oracle</text>
+  <text x="48" y="338" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14">configured bounds: 30000 ms execution; &lt;= 19000 ms later cleanup; separate contexts</text>
+  <text x="48" y="374" fill="#e6edf3" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14">categorical sha256: 7b6b4a3076eb811cd3c463e5fa6cee313769d4a1941242093d384f11ebce127f</text>
+  <text x="48" y="410" fill="#d2a8ff" font-family="DejaVu Sans Mono, ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14">performance: false; measured diagnostic intervals excluded; no fairness, service-share, latency, or RSS claim</text>
+</svg>

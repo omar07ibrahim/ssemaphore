@@ -1,0 +1,10 @@
+reproduce: GOTOOLCHAIN=go1.26.5 go run ./tools/run_saturation --profile=ci --seed=20260725
+scope: one bounded synthetic numeric-loopback request-count saturation run
+accounting: 28 jobs = 26 service + 1 control + 1 global probe; reconciled
+service: 24 admitted -> 20 completed + 2 canceled + 2 queue deadline; 2 rejected
+tenant capacity: 2 x HTTP 429; upstream requests 0
+global capacity: 1 x HTTP 503; upstream requests 0
+dispatch: 20 observed == 20 independent WDRR oracle
+configured bounds: 30000 ms execution; <= 19000 ms later cleanup; separate contexts
+categorical sha256: 7b6b4a3076eb811cd3c463e5fa6cee313769d4a1941242093d384f11ebce127f
+performance: false; measured diagnostic intervals excluded; no fairness, service-share, latency, or RSS claim

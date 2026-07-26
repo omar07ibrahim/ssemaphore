@@ -14,7 +14,7 @@ HTTP/1 upstream transport.
 > transport, bounded inbound serving, and signal-owned shutdown.
 >
 > **Not implemented:** telemetry, a lifecycle journal, restart reconciliation,
-> and published load, RSS, or weighted-service evidence.
+> and published load, RSS, overhead, or multi-seed service-share benchmarks.
 
 ## Verified loopback result
 
@@ -38,6 +38,37 @@ harness proves only the checks shown:
 
 [Machine-readable evidence](docs/visuals/generated/loopback-evidence.json) ·
 [plain evidence summary](docs/visuals/generated/loopback-evidence.txt) ·
+[SHA-256 provenance manifest](docs/visuals/generated/manifest.sha256.json)
+
+## Verified bounded saturation result
+
+[![Verified SSEmaphore bounded saturation terminal evidence](docs/visuals/generated/saturation-terminal.svg)](docs/visuals/generated/saturation-terminal.svg)
+
+One fixed-seed Linux/amd64 run exercised the production parser, scheduler,
+HTTP relay, and server over numeric loopback. Its categorical projection
+reconciles all 28 jobs: 26 service submissions, one control request, and one
+dedicated global-capacity probe. The run observed:
+
+- 20 completed, two canceled, two queue-deadline, and two rejected service
+  requests;
+- two exact tenant-capacity `429` responses and one exact global-capacity
+  `503`, all before any upstream request;
+- 20 observed dispatches equal to 20 dispatches from the independent bounded
+  weighted-DRR oracle;
+- separate configured execution and cleanup envelopes.
+
+[![Exact bounded saturation request-count outcomes](docs/visuals/generated/saturation-outcomes.svg)](docs/visuals/generated/saturation-outcomes.svg)
+
+[![Fixed-seed weighted DRR dispatch trace](docs/visuals/generated/saturation-dispatch.svg)](docs/visuals/generated/saturation-dispatch.svg)
+
+This is exact request-count and dispatch-order evidence from one synthetic run.
+The configured weights are inputs. The result is **not** a `1:3` allocation,
+fairness score, throughput, latency, RSS, or service-share measurement.
+Measured one-run diagnostic intervals are excluded from the committed
+projection; configured timeout envelopes are retained as configuration.
+
+[Machine-readable saturation evidence](docs/visuals/generated/saturation-evidence.json) ·
+[plain saturation summary](docs/visuals/generated/saturation-evidence.txt) ·
 [SHA-256 provenance manifest](docs/visuals/generated/manifest.sha256.json)
 
 ## Why this exists
@@ -144,20 +175,37 @@ shutdown behavior.
 
 ## Reproduce the evidence
 
-The generator builds and launches the real CLI, creates random process-scoped
-credentials, uses a private temporary directory for its binary and policy,
-runs a controlled numeric-loopback buffered request and stream, sends a real
-`SIGTERM`, and emits only bounded content-free results.
+The generator performs two independent production-path runs. It builds and
+launches the real CLI with process-scoped credentials for the controlled
+buffered/SSE loopback workflow, including a real `SIGTERM`. Separately, it
+builds the bounded saturation harness in a private directory with a controlled
+Go environment and validates its strict fixed-seed report before projecting
+only categorical evidence.
 
 ```sh
 GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals
 GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals --check
 ```
 
-The same generator renders the terminal result, sequence, architecture, and
-setup diagrams. The manifest binds production sources, generator sources, the
-example policy, runbook, and published artifacts with SHA-256. These digests
-support deterministic review; they are not signatures or attestations.
+To inspect the harness's full one-run report directly:
+
+```sh
+GOTOOLCHAIN=go1.26.5 go run ./tools/run_saturation \
+  --profile=ci --seed=20260725
+```
+
+That direct compact JSON includes measured diagnostic intervals that vary
+between runs. They have no thresholds or service-level meaning and are not a
+performance dataset. The committed categorical projection excludes those
+measurements and retains request accounting, configured timeout envelopes, and
+the seeded dispatch trace.
+
+The generator renders the loopback terminal, streaming sequence, architecture,
+setup workflow, saturation terminal, exact outcomes, and dispatch trace. The
+manifest binds production sources, generator sources, saturation-harness
+sources, the example policy, runbook, and every published artifact with
+SHA-256. These digests support deterministic review; they are not signatures
+or attestations.
 
 Renderer-managed source reads and artifact-output traversal are confined with
 Go's `os.Root`; every managed component must be a real directory or regular
@@ -175,11 +223,11 @@ manifest visible. Honor the failed command: rerun the generator without
 `--check` so it rewrites and re-syncs the bundle, then run `--check`. A passing
 read-only check by itself does not restore or prove crash durability.
 
-Runtime loopback evidence deliberately contains no ports, endpoints, host
-paths, environment-variable names, request IDs, raw headers or bodies,
-timestamps, durations, credential values, or secret-derived hashes. The static
-setup diagram shows only the three non-secret environment names committed in
-the example policy.
+Published runtime evidence deliberately contains no ports, endpoints, host
+paths, request IDs, raw headers or bodies, timestamps, measured durations,
+credential values, or secret-derived hashes. Loopback evidence also omits
+environment-variable names. The static setup diagram shows only the three
+non-secret environment names committed in the example policy.
 
 ## Design decisions worth reviewing
 
@@ -212,8 +260,8 @@ GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals --check
 
 Tests include strict decoder cases, corpus-seeded fuzz inputs, scheduler golden
 traces, an independent seeded DRR oracle, deterministic cancellation races,
-raw HTTP wire tests, real loopback integration, repeated shutdown, and
-committed-visual freshness.
+raw HTTP wire tests, real loopback integration, a 28-job bounded saturation
+harness, repeated shutdown, and committed-visual freshness.
 
 ## Scope and roadmap
 
@@ -227,7 +275,9 @@ Future work is kept outside the implemented architecture:
 - content-free metrics and traces;
 - a bounded lifecycle journal;
 - restart reconciliation;
-- published load, RSS, overhead, queue-accuracy, and weighted-service evidence.
+- published load, RSS, overhead, and queue-accuracy evidence;
+- a multi-seed service-share benchmark with an explicit allocation error
+  bound.
 
 Those features become current only when their code and reproducible evidence
 land together.

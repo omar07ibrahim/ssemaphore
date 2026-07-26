@@ -1,10 +1,23 @@
 {
-  "schema": "ssemaphore.readme-visuals.v1",
-  "demo": {
-    "command": "GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals",
-    "scope": "one Linux gateway instance, one tenant, two synthetic numeric-loopback requests",
-    "toolchain": "go1.26.5",
-    "platform": "linux"
+  "schema": "ssemaphore.readme-visuals.v2",
+  "runs": {
+    "loopback": {
+      "command": "GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals",
+      "scope": "one Linux gateway instance, one tenant, two synthetic numeric-loopback requests",
+      "toolchain": "go1.26.5",
+      "platform": "linux"
+    },
+    "saturation": {
+      "command": "GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals",
+      "reproduce_command": "GOTOOLCHAIN=go1.26.5 go run ./tools/run_saturation --profile=ci --seed=20260725",
+      "scope": "one bounded synthetic numeric-loopback request-count saturation run",
+      "toolchain": "go1.26.5",
+      "platform": "linux",
+      "architecture": "amd64",
+      "seed": 20260725,
+      "diagnostic_timings_included": false,
+      "performance_claim": false
+    }
   },
   "provenance": {
     "engine": {
@@ -46,7 +59,7 @@
         "internal/server/listener.go",
         "internal/server/server.go"
       ],
-      "sha256": "5346bf03f2872330e53bc3f7b6b90c02bc34a38803ee0a41a4ead4747e4b47dd"
+      "sha256": "a41fa611a9fd327530dc3ce897b4a0f91a2cc6605623d778890bbf4b6f67fc19"
     },
     "generator": {
       "files": [
@@ -54,12 +67,23 @@
         "tools/render_readme_visuals/demo.go",
         "tools/render_readme_visuals/main.go",
         "tools/render_readme_visuals/render.go",
+        "tools/render_readme_visuals/saturation.go",
+        "tools/render_readme_visuals/saturation_render.go",
         "tools/render_readme_visuals/setup.go",
         "tools/render_readme_visuals/visualfs.go",
         "tools/render_readme_visuals/visualfs_open_linux.go",
         "tools/render_readme_visuals/visualfs_open_other.go"
       ],
-      "sha256": "f498b6d4c93fae36ae8d4d9c8e57e89f479077aa8ea0efbfd7968f3499c62b34"
+      "sha256": "fd0ba7c3d3ec8a7f36ba670a6cc6503f52fcaddd3c36614ad0401d225e871ea4"
+    },
+    "saturation_harness": {
+      "files": [
+        "tools/run_saturation/harness.go",
+        "tools/run_saturation/main.go",
+        "tools/run_saturation/upstream.go",
+        "tools/run_saturation/workload.go"
+      ],
+      "sha256": "abd9e0405ad7bf8db85548b3a443742749658581a52ab50fb9a6d83ce9310eb5"
     },
     "policy_example": {
       "path": "configs/policy.example.json",
@@ -83,6 +107,26 @@
     "loopback-terminal.svg": {
       "bytes": 2690,
       "sha256": "be7675f64e55ec88d3a06f7f689ac81de37f63b16bc55e5924e86fd48d19340e"
+    },
+    "saturation-dispatch.svg": {
+      "bytes": 11802,
+      "sha256": "30847e522bd9e5dfd480c5226720e289f612dd10ace0c4a6e66514d784a68028"
+    },
+    "saturation-evidence.json": {
+      "bytes": 9743,
+      "sha256": "c94549413dc1846c14790805785b4a566bc66c69eb392be215d16adb0731a6a4"
+    },
+    "saturation-evidence.txt": {
+      "bytes": 754,
+      "sha256": "c00a5933eb48067b3cbf2a96a1bf660369e24d6f256080b365b6c1e0b779b09f"
+    },
+    "saturation-outcomes.svg": {
+      "bytes": 4894,
+      "sha256": "7cf2e76dcced1f018245d225805e91a6a78507312e6ea317f0d349ea4bf5f251"
+    },
+    "saturation-terminal.svg": {
+      "bytes": 3101,
+      "sha256": "67c74a9e6fec5d90db6ad82e4fb031df955f608fb12c94d3c0e66ac973bea7f0"
     },
     "setup-workflow.svg": {
       "bytes": 8322,

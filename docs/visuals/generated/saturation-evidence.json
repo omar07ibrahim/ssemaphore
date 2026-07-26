@@ -1,0 +1,395 @@
+{
+  "schema": "ssemaphore.saturation-evidence.v1",
+  "scope": "one bounded synthetic numeric-loopback request-count saturation run",
+  "toolchain": "go1.26.5",
+  "platform": "linux",
+  "architecture": "amd64",
+  "performance_claim": false,
+  "diagnostic_timings_included": false,
+  "categorical_projection": {
+    "schema_version": 3,
+    "profile": "ci",
+    "seed": 20260725,
+    "topology": {
+      "gateway": "production parser, scheduler, HTTP relay, and server",
+      "transport": "HTTP/1 over numeric loopback",
+      "controlled_upstream": true,
+      "seeded_arrival_order": true,
+      "scheduler_snapshot_barriers": true,
+      "global_inflight_requests": 1,
+      "global_queued_requests": 20,
+      "service_requests_per_tenant": 10
+    },
+    "service_totals": {
+      "submitted": 26,
+      "admitted": 24,
+      "rejected": 2,
+      "completed": 20,
+      "canceled": 2,
+      "deadline_exceeded": 2
+    },
+    "control": {
+      "submitted": 1,
+      "admitted": 1,
+      "completed": 1,
+      "upstream_requests": 1
+    },
+    "capacity_probes": {
+      "tenant_capacity": {
+        "scope": "two saturated service tenants",
+        "submitted": 2,
+        "rejected": 2,
+        "status_code": 429,
+        "error_code": "tenant_capacity_exhausted",
+        "upstream_requests": 0
+      },
+      "global_capacity": {
+        "scope": "dedicated tenant with available tenant capacity",
+        "submitted": 1,
+        "rejected": 1,
+        "status_code": 503,
+        "error_code": "overloaded",
+        "upstream_requests": 0
+      }
+    },
+    "accounting": {
+      "total_jobs": 28,
+      "service_submissions": 26,
+      "control_submissions": 1,
+      "global_probe_submissions": 1,
+      "total_upstream_requests": 21,
+      "reconciled": true,
+      "boundary": "service_totals include two tenant-capacity probes; control and the global-capacity probe are separate"
+    },
+    "timeout_envelopes": {
+      "execution_context_ms": 30000,
+      "graceful_cleanup_attempt_ms": 9000,
+      "abort_cleanup_reserve_ms": 10000,
+      "maximum_cleanup_ms": 19000,
+      "separate_cleanup_envelope": true,
+      "boundary": "the execution context and subsequent cleanup waits use separate bounded envelopes, not one wall-clock deadline"
+    },
+    "tenants": [
+      {
+        "tenant": "tenant-a",
+        "weight": 1,
+        "submitted": 13,
+        "admitted": 12,
+        "rejected": 1,
+        "completed": 10,
+        "canceled": 1,
+        "deadline_exceeded": 1,
+        "dispatched_requests": 10,
+        "dispatched_work_units": 1388
+      },
+      {
+        "tenant": "tenant-b",
+        "weight": 3,
+        "submitted": 13,
+        "admitted": 12,
+        "rejected": 1,
+        "completed": 10,
+        "canceled": 1,
+        "deadline_exceeded": 1,
+        "dispatched_requests": 10,
+        "dispatched_work_units": 1331
+      }
+    ],
+    "service": {
+      "oracle": "independent bounded weighted deficit round-robin state machine",
+      "oracle_match": true,
+      "expected_dispatch": [
+        {
+          "position": 1,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 110,
+          "mode": "buffered"
+        },
+        {
+          "position": 2,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 106,
+          "mode": "buffered"
+        },
+        {
+          "position": 3,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 161,
+          "mode": "buffered"
+        },
+        {
+          "position": 4,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 137,
+          "mode": "buffered"
+        },
+        {
+          "position": 5,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 134,
+          "mode": "buffered"
+        },
+        {
+          "position": 6,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 117,
+          "mode": "buffered"
+        },
+        {
+          "position": 7,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 152,
+          "mode": "buffered"
+        },
+        {
+          "position": 8,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 121,
+          "mode": "buffered"
+        },
+        {
+          "position": 9,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 158,
+          "mode": "buffered"
+        },
+        {
+          "position": 10,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 133,
+          "mode": "buffered"
+        },
+        {
+          "position": 11,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 125,
+          "mode": "buffered"
+        },
+        {
+          "position": 12,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 119,
+          "mode": "buffered"
+        },
+        {
+          "position": 13,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 141,
+          "mode": "sse"
+        },
+        {
+          "position": 14,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 160,
+          "mode": "buffered"
+        },
+        {
+          "position": 15,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 148,
+          "mode": "buffered"
+        },
+        {
+          "position": 16,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 138,
+          "mode": "buffered"
+        },
+        {
+          "position": 17,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 159,
+          "mode": "buffered"
+        },
+        {
+          "position": 18,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 150,
+          "mode": "buffered"
+        },
+        {
+          "position": 19,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 114,
+          "mode": "buffered"
+        },
+        {
+          "position": 20,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 136,
+          "mode": "sse"
+        }
+      ],
+      "observed_dispatch": [
+        {
+          "position": 1,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 110,
+          "mode": "buffered"
+        },
+        {
+          "position": 2,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 106,
+          "mode": "buffered"
+        },
+        {
+          "position": 3,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 161,
+          "mode": "buffered"
+        },
+        {
+          "position": 4,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 137,
+          "mode": "buffered"
+        },
+        {
+          "position": 5,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 134,
+          "mode": "buffered"
+        },
+        {
+          "position": 6,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 117,
+          "mode": "buffered"
+        },
+        {
+          "position": 7,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 152,
+          "mode": "buffered"
+        },
+        {
+          "position": 8,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 121,
+          "mode": "buffered"
+        },
+        {
+          "position": 9,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 158,
+          "mode": "buffered"
+        },
+        {
+          "position": 10,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 133,
+          "mode": "buffered"
+        },
+        {
+          "position": 11,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 125,
+          "mode": "buffered"
+        },
+        {
+          "position": 12,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 119,
+          "mode": "buffered"
+        },
+        {
+          "position": 13,
+          "tenant": "tenant-b",
+          "weight": 3,
+          "work_units": 141,
+          "mode": "sse"
+        },
+        {
+          "position": 14,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 160,
+          "mode": "buffered"
+        },
+        {
+          "position": 15,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 148,
+          "mode": "buffered"
+        },
+        {
+          "position": 16,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 138,
+          "mode": "buffered"
+        },
+        {
+          "position": 17,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 159,
+          "mode": "buffered"
+        },
+        {
+          "position": 18,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 150,
+          "mode": "buffered"
+        },
+        {
+          "position": 19,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 114,
+          "mode": "buffered"
+        },
+        {
+          "position": 20,
+          "tenant": "tenant-a",
+          "weight": 1,
+          "work_units": 136,
+          "mode": "sse"
+        }
+      ],
+      "upstream_requests": 20
+    }
+  },
+  "categorical_evidence": {
+    "projection": "seeded accounting and dispatch trace",
+    "digest_algorithm": "SHA-256",
+    "digest": "7b6b4a3076eb811cd3c463e5fa6cee313769d4a1941242093d384f11ebce127f",
+    "excludes_timing": true,
+    "byte_reproducible": true
+  }
+}
