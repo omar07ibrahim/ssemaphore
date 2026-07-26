@@ -102,23 +102,41 @@ type visualShutdownEvidence struct {
 
 type visualManifest struct {
 	Schema     string                            `json:"schema"`
-	Demo       visualManifestDemo                `json:"demo"`
+	Runs       visualManifestRuns                `json:"runs"`
 	Provenance visualManifestProvenance          `json:"provenance"`
 	Artifacts  map[string]visualArtifactMetadata `json:"artifacts"`
 }
 
-type visualManifestDemo struct {
+type visualManifestRuns struct {
+	Loopback   visualManifestRun           `json:"loopback"`
+	Saturation visualManifestSaturationRun `json:"saturation"`
+}
+
+type visualManifestRun struct {
 	Command   string `json:"command"`
 	Scope     string `json:"scope"`
 	Toolchain string `json:"toolchain"`
 	Platform  string `json:"platform"`
 }
 
+type visualManifestSaturationRun struct {
+	Command                   string `json:"command"`
+	ReproduceCommand          string `json:"reproduce_command"`
+	Scope                     string `json:"scope"`
+	Toolchain                 string `json:"toolchain"`
+	Platform                  string `json:"platform"`
+	Architecture              string `json:"architecture"`
+	Seed                      uint64 `json:"seed"`
+	DiagnosticTimingsIncluded bool   `json:"diagnostic_timings_included"`
+	Performance               bool   `json:"performance_claim"`
+}
+
 type visualManifestProvenance struct {
-	Engine    visualSourceDigest `json:"engine"`
-	Generator visualSourceDigest `json:"generator"`
-	Policy    visualFileDigest   `json:"policy_example"`
-	Scope     string             `json:"scope"`
+	Engine            visualSourceDigest `json:"engine"`
+	Generator         visualSourceDigest `json:"generator"`
+	SaturationHarness visualSourceDigest `json:"saturation_harness"`
+	Policy            visualFileDigest   `json:"policy_example"`
+	Scope             string             `json:"scope"`
 }
 
 type visualSourceDigest struct {
@@ -178,7 +196,11 @@ func validateDemoEvidence(evidence demoEvidence) error {
 	}
 }
 
-func buildVisualArtifacts(root string, evidence demoEvidence) (map[string][]byte, error) {
+func buildVisualArtifacts(
+	root string,
+	evidence demoEvidence,
+	saturation saturationVisualEvidence,
+) (map[string][]byte, error) {
 	document := evidenceDocument(evidence)
 	evidenceJSON, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
@@ -195,6 +217,16 @@ func buildVisualArtifacts(root string, evidence demoEvidence) (map[string][]byte
 		visualArchitectureName: []byte(renderArchitectureSVG()),
 		visualSetupName:        []byte(renderSetupWorkflowSVG()),
 	}
+	saturationArtifacts, err := buildSaturationVisualArtifacts(saturation)
+	if err != nil {
+		return nil, err
+	}
+	for name, payload := range saturationArtifacts {
+		if _, exists := artifacts[name]; exists {
+			return nil, errors.New("duplicate visual artifact name")
+		}
+		artifacts[name] = payload
+	}
 	for name, payload := range artifacts {
 		if err := ensureVisualPublishable(string(payload)); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
@@ -210,6 +242,15 @@ func buildVisualArtifacts(root string, evidence demoEvidence) (map[string][]byte
 			"docs/running.md",
 		},
 		[]string{"cmd", "internal"},
+		false,
+	)
+	if err != nil {
+		return nil, err
+	}
+	saturationHarness, err := digestVisualSources(
+		root,
+		nil,
+		[]string{"tools/run_saturation"},
 		false,
 	)
 	if err != nil {
@@ -240,16 +281,31 @@ func buildVisualArtifacts(root string, evidence demoEvidence) (map[string][]byte
 	}
 
 	manifest := visualManifest{
-		Schema: "ssemaphore.readme-visuals.v1",
-		Demo: visualManifestDemo{
-			Command:   "GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals",
-			Scope:     document.Scope,
-			Toolchain: evidence.GoVersion,
-			Platform:  evidence.OperatingSystem,
+		Schema: "ssemaphore.readme-visuals.v2",
+		Runs: visualManifestRuns{
+			Loopback: visualManifestRun{
+				Command:   "GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals",
+				Scope:     document.Scope,
+				Toolchain: evidence.GoVersion,
+				Platform:  evidence.OperatingSystem,
+			},
+			Saturation: visualManifestSaturationRun{
+				Command: "GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals",
+				ReproduceCommand: "GOTOOLCHAIN=go1.26.5 go run ./tools/run_saturation " +
+					"--profile=ci --seed=20260725",
+				Scope:                     saturation.Scope,
+				Toolchain:                 saturation.Toolchain,
+				Platform:                  saturation.Platform,
+				Architecture:              saturation.Architecture,
+				Seed:                      saturation.Projection.Seed,
+				DiagnosticTimingsIncluded: saturation.DiagnosticTimingsIncluded,
+				Performance:               saturation.PerformanceClaim,
+			},
 		},
 		Provenance: visualManifestProvenance{
-			Engine:    engine,
-			Generator: generator,
+			Engine:            engine,
+			Generator:         generator,
+			SaturationHarness: saturationHarness,
 			Policy: visualFileDigest{
 				Path:   policyPath,
 				SHA256: visualSHA256(policyBytes),

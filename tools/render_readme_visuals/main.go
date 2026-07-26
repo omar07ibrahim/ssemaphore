@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	visualOutputDirectory = "docs/visuals/generated"
-	visualManifestName    = "manifest.sha256.json"
-	visualRunTimeout      = 45 * time.Second
+	visualOutputDirectory    = "docs/visuals/generated"
+	visualManifestName       = "manifest.sha256.json"
+	visualLoopbackRunTimeout = 45 * time.Second
 )
 
 func main() {
@@ -36,9 +36,12 @@ func runVisualCLI(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), visualRunTimeout)
-	defer cancel()
-	evidence, err := runLoopbackDemo(ctx, root)
+	loopbackContext, cancelLoopback := context.WithTimeout(
+		context.Background(),
+		visualLoopbackRunTimeout,
+	)
+	evidence, err := runLoopbackDemo(loopbackContext, root)
+	cancelLoopback()
 	if err != nil {
 		_, _ = io.WriteString(stderr, "render_readme_visuals: loopback verification failed\n")
 		return 1
@@ -48,7 +51,22 @@ func runVisualCLI(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	artifacts, err := buildVisualArtifacts(root, evidence)
+	saturationContext, cancelSaturation := context.WithTimeout(
+		context.Background(),
+		visualSaturationOverallTimeout,
+	)
+	saturation, err := runSaturationVisual(saturationContext, root)
+	cancelSaturation()
+	if err != nil {
+		_, _ = io.WriteString(stderr, "render_readme_visuals: saturation verification failed\n")
+		return 1
+	}
+	if err := validateSaturationVisualEvidence(saturation); err != nil {
+		_, _ = io.WriteString(stderr, "render_readme_visuals: saturation contract failed\n")
+		return 1
+	}
+
+	artifacts, err := buildVisualArtifacts(root, evidence, saturation)
 	if err != nil {
 		_, _ = io.WriteString(stderr, "render_readme_visuals: artifact build failed\n")
 		return 1

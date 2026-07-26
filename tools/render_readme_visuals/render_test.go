@@ -8,9 +8,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestValidateDemoEvidenceRequiresEveryPublishedInvariant(t *testing.T) {
@@ -64,16 +64,24 @@ func TestVisualArtifactsAreDeterministicAccessibleAndSelfContained(t *testing.T)
 	if err != nil {
 		t.Fatalf("visualRepositoryRoot() error = %v", err)
 	}
-	first, err := buildVisualArtifacts(root, completeDemoEvidence())
+	first, err := buildVisualArtifacts(
+		root,
+		completeDemoEvidence(),
+		completeSaturationVisualEvidence(),
+	)
 	if err != nil {
 		t.Fatalf("buildVisualArtifacts(first) error = %v", err)
 	}
-	second, err := buildVisualArtifacts(root, completeDemoEvidence())
+	second, err := buildVisualArtifacts(
+		root,
+		completeDemoEvidence(),
+		completeSaturationVisualEvidence(),
+	)
 	if err != nil {
 		t.Fatalf("buildVisualArtifacts(second) error = %v", err)
 	}
-	if len(first) != 7 || len(second) != len(first) {
-		t.Fatalf("artifact counts = %d/%d, want 7/7", len(first), len(second))
+	if len(first) != 12 || len(second) != len(first) {
+		t.Fatalf("artifact counts = %d/%d, want 12/12", len(first), len(second))
 	}
 	for name, payload := range first {
 		if string(second[name]) != string(payload) {
@@ -89,6 +97,9 @@ func TestVisualArtifactsAreDeterministicAccessibleAndSelfContained(t *testing.T)
 		visualSequenceName,
 		visualArchitectureName,
 		visualSetupName,
+		visualSaturationTerminalName,
+		visualSaturationOutcomesName,
+		visualSaturationDispatchName,
 	} {
 		payload := string(first[name])
 		decoder := xml.NewDecoder(strings.NewReader(payload))
@@ -144,16 +155,63 @@ func TestVisualArtifactsAreDeterministicAccessibleAndSelfContained(t *testing.T)
 		}
 	}
 
+	terminal := string(first[visualSaturationTerminalName])
+	for _, required := range []string{
+		"28 jobs = 26 service + 1 control + 1 global probe",
+		"2 x HTTP 429; upstream requests 0",
+		"1 x HTTP 503; upstream requests 0",
+		"20 observed == 20 independent WDRR oracle",
+		"performance: false",
+		"measured diagnostic intervals excluded",
+	} {
+		if !strings.Contains(terminal, required) {
+			t.Fatalf("%s is missing exact boundary %q", visualSaturationTerminalName, required)
+		}
+	}
+	outcomes := string(first[visualSaturationOutcomesName])
+	for _, required := range []string{
+		"Exact request-count outcomes from one bounded run",
+		"fixed seed 20260725",
+		"not throughput, latency, RSS, fairness score, or service-share evidence",
+	} {
+		if !strings.Contains(outcomes, required) {
+			t.Fatalf("%s is missing exact boundary %q", visualSaturationOutcomesName, required)
+		}
+	}
+	dispatch := string(first[visualSaturationDispatchName])
+	for _, required := range []string{
+		"Seeded WDRR dispatch trace - expected equals observed",
+		"20 production-path service dispatches",
+		"ORACLE MATCH 20 / 20",
+		"not a 3:1 allocation, fairness score, throughput, or latency result",
+	} {
+		if !strings.Contains(dispatch, required) {
+			t.Fatalf("%s is missing exact boundary %q", visualSaturationDispatchName, required)
+		}
+	}
+
 	var manifest visualManifest
 	if err := json.Unmarshal(first[visualManifestName], &manifest); err != nil {
 		t.Fatalf("decode manifest: %v", err)
 	}
-	if manifest.Schema != "ssemaphore.readme-visuals.v1" {
+	if manifest.Schema != "ssemaphore.readme-visuals.v2" {
 		t.Fatalf("manifest schema = %q", manifest.Schema)
 	}
 	if len(manifest.Provenance.Engine.Files) == 0 ||
-		len(manifest.Provenance.Generator.Files) == 0 {
+		len(manifest.Provenance.Generator.Files) == 0 ||
+		len(manifest.Provenance.SaturationHarness.Files) == 0 {
 		t.Fatal("manifest source lists are empty")
+	}
+	saturationRun := manifest.Runs.Saturation
+	if saturationRun.Seed != visualSaturationSeed ||
+		saturationRun.Command !=
+			"GOTOOLCHAIN=go1.26.5 go run ./tools/render_readme_visuals" ||
+		saturationRun.ReproduceCommand !=
+			"GOTOOLCHAIN=go1.26.5 go run ./tools/run_saturation "+
+				"--profile=ci --seed=20260725" ||
+		saturationRun.DiagnosticTimingsIncluded ||
+		saturationRun.Performance {
+		t.Fatalf("manifest saturation boundary = %+v", saturationRun)
 	}
 	for name, metadata := range manifest.Artifacts {
 		if metadata.Bytes != len(first[name]) || metadata.SHA256 != visualSHA256(first[name]) {
@@ -239,24 +297,44 @@ func TestPublishabilityGateRejectsHostDetailsAndCredentialForms(t *testing.T) {
 	}
 }
 
-func TestCommittedVisualsMatchFreshRealLoopbackRun(t *testing.T) {
+func TestCommittedVisualsMatchFreshRealRuns(t *testing.T) {
 	if testing.Short() {
-		t.Skip("real binary loopback evidence is a release test")
+		t.Skip("real binary visual evidence is a release test")
+	}
+	if runtime.GOARCH != "amd64" {
+		t.Skip("committed saturation evidence records the amd64 source run")
 	}
 	root, err := visualRepositoryRoot()
 	if err != nil {
 		t.Fatalf("visualRepositoryRoot() error = %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
-	defer cancel()
-	evidence, err := runLoopbackDemo(ctx, root)
+	loopbackContext, cancelLoopback := context.WithTimeout(
+		context.Background(),
+		visualLoopbackRunTimeout,
+	)
+	evidence, err := runLoopbackDemo(loopbackContext, root)
+	cancelLoopback()
 	if err != nil {
 		t.Fatalf("runLoopbackDemo() failed")
 	}
 	if err := validateDemoEvidence(evidence); err != nil {
 		t.Fatalf("validateDemoEvidence(real) error = %v", err)
 	}
-	artifacts, err := buildVisualArtifacts(root, evidence)
+
+	saturationContext, cancelSaturation := context.WithTimeout(
+		context.Background(),
+		visualSaturationOverallTimeout,
+	)
+	saturation, err := runSaturationVisual(saturationContext, root)
+	cancelSaturation()
+	if err != nil {
+		t.Fatalf("runSaturationVisual() failed")
+	}
+	if err := validateSaturationVisualEvidence(saturation); err != nil {
+		t.Fatalf("validateSaturationVisualEvidence(real) error = %v", err)
+	}
+
+	artifacts, err := buildVisualArtifacts(root, evidence, saturation)
 	if err != nil {
 		t.Fatalf("buildVisualArtifacts(real) error = %v", err)
 	}
