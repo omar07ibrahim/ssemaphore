@@ -159,7 +159,7 @@ func renderSaturationOutcomesSVG(evidence saturationVisualEvidence) string {
   <text x="%d" y="194" text-anchor="middle" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="700">%d reject</text>
 
   <rect x="54" y="270" width="336" height="244" rx="16" fill="#ffffff" stroke="#0969da" stroke-width="2"/>
-  <text x="82" y="310" fill="#0550ae" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700">%s - configured weight %d</text>
+  <text x="82" y="310" fill="#0550ae" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700">%s - weight %d</text>
   <text x="82" y="348" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="16">submitted             %d</text>
   <text x="82" y="378" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="16">admitted              %d</text>
   <text x="82" y="408" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="16">complete/cancel/dead  %d / %d / %d</text>
@@ -167,7 +167,7 @@ func renderSaturationOutcomesSVG(evidence saturationVisualEvidence) string {
   <text x="82" y="468" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="16">dispatches/work units %d / %d</text>
 
   <rect x="432" y="270" width="336" height="244" rx="16" fill="#ffffff" stroke="#8250df" stroke-width="2"/>
-  <text x="460" y="310" fill="#6639ba" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700">%s - configured weight %d</text>
+  <text x="460" y="310" fill="#6639ba" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700">%s - weight %d</text>
   <text x="460" y="348" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="16">submitted             %d</text>
   <text x="460" y="378" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="16">admitted              %d</text>
   <text x="460" y="408" fill="#24292f" font-family="DejaVu Sans Mono, monospace" font-size="16">complete/cancel/dead  %d / %d / %d</text>
