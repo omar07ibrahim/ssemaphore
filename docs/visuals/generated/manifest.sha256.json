@@ -59,7 +59,7 @@
         "internal/server/listener.go",
         "internal/server/server.go"
       ],
-      "sha256": "a41fa611a9fd327530dc3ce897b4a0f91a2cc6605623d778890bbf4b6f67fc19"
+      "sha256": "3702377608f9afc14247164300e2359ada8451f42c94eb26e76a2021d0bff531"
     },
     "generator": {
       "files": [
