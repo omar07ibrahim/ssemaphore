@@ -380,15 +380,15 @@ func (h *Handler) queueTimeout(values []string) (time.Duration, bool) {
 			return 0, false
 		}
 	}
-	milliseconds, err := strconv.ParseUint(values[0], 10, 64)
-	if err != nil || milliseconds == 0 {
+	milliseconds, err := strconv.ParseInt(values[0], 10, 64)
+	if err != nil || milliseconds <= 0 {
 		return 0, false
 	}
-	timeout := time.Duration(milliseconds) * time.Millisecond
-	if timeout <= 0 || timeout > h.defaultQueueTimeout {
+	maximumMilliseconds := int64(h.defaultQueueTimeout / time.Millisecond)
+	if milliseconds > maximumMilliseconds {
 		return 0, false
 	}
-	return timeout, true
+	return time.Duration(milliseconds) * time.Millisecond, true
 }
 
 type preDispatchLease struct {

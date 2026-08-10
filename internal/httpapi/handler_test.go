@@ -449,6 +449,7 @@ func TestHandlerUsesDefaultOrStrictlyBoundedQueueTimeout(t *testing.T) {
 		{name: "negative", header: "-1", wantReject: true},
 		{name: "fraction", header: "1.5", wantReject: true},
 		{name: "over default", header: "251", wantReject: true},
+		{name: "maximum lexical integer", header: "9999999999", wantReject: true},
 		{name: "overflow length", header: "99999999999", wantReject: true},
 	}
 
